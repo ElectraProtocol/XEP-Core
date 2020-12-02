@@ -8,6 +8,7 @@
 #include <primitives/transaction.h>
 #include <script/interpreter.h>
 #include <consensus/validation.h>
+#include <policy/policy.h>
 
 // TODO remove the following dependencies
 #include <chain.h>
@@ -156,6 +157,17 @@ int64_t GetTransactionSigOpCost(const CTransaction& tx, const CCoinsViewCache& i
     return nSigOps;
 }
 
+CAmount GetMinFee(const CTransaction& tx)
+{
+    //int64_t nBytes = ::GetSerializeSize(tx, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_WITNESS);
+    int64_t vBytes = GetVirtualTransactionSize(tx); // Remember, fees are normally calculated in sats/KB
+    CAmount nMinFee = vBytes * 1000 / 1000; // DEFAULT_TRANSACTION_MINFEE / 1000;
+
+    if (!MoneyRange(nMinFee))
+        nMinFee = MAX_MONEY;
+    return nMinFee;
+}
+
 bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee)
 {
     // are the actual inputs available?
@@ -194,6 +206,12 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, 
     if (!MoneyRange(txfee_aux)) {
         return state.Invalid(TxValidationResult::TX_CONSENSUS, "bad-txns-fee-outofrange");
     }
+
+    // peercoin: enforce transaction fees for every block
+    const CAmount minfee = GetMinFee(tx);
+    if (txfee_aux < minfee)
+        return state.Invalid(TxValidationResult::TX_CONSENSUS, "bad-txns-fee-not-enough",
+            strprintf("txfee (%s) < minfee (%s)", FormatMoney(txfee_aux), FormatMoney(minfee)));
 
     txfee = txfee_aux;
     return true;
