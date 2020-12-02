@@ -254,7 +254,7 @@ public:
         return (int64_t)nTimeMax;
     }
 
-    static constexpr int nMedianTimeSpan = 11;
+    static constexpr int nMedianTimeSpan = 1;
 
     int64_t GetMedianTimePast() const
     {
