@@ -35,7 +35,25 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const interface
     uint256 hash = wtx.tx->GetHash();
     std::map<std::string, std::string> mapValue = wtx.value_map;
 
-    if (nNet > 0 || wtx.is_coinbase)
+    if (wtx.is_coinstake) // peercoin: coinstake transaction
+    {
+        TransactionRecord sub(hash, nTime, TransactionRecord::StakeMint, "", -nDebit, 0);
+
+        for (unsigned int i = 0; i < wtx.tx->vout.size(); i++) {
+            const CTxOut& txout = wtx.tx->vout[i];
+            isminetype mine = wtx.txout_is_mine[i];
+            if (mine) {
+                sub.credit += txout.nValue;
+                if (wtx.txout_address_is_mine[i])
+                    sub.address = EncodeDestination(wtx.txout_address[i]);
+                sub.involvesWatchAddress = mine & ISMINE_WATCH_ONLY;
+                sub.idx = i; // vout index
+            }
+        }
+
+        parts.append(sub);
+    }
+    else if (nNet > 0 || wtx.is_coinbase)
     {
         //
         // Credit
@@ -188,7 +206,7 @@ void TransactionRecord::updateStatus(const interfaces::WalletTxStatus& wtx, cons
         }
     }
     // For generated transactions, determine maturity
-    else if(type == TransactionRecord::Generated)
+    else if(type == TransactionRecord::Generated || type == TransactionRecord::StakeMint)
     {
         if (wtx.blocks_to_maturity > 0)
         {
