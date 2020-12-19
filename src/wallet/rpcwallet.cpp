@@ -526,6 +526,100 @@ static RPCHelpMan sendtoaddress()
     };
 }
 
+static RPCHelpMan burncoins()
+{
+    return RPCHelpMan{"burncoins",
+                "\nBurn an amount of coins." +
+        HELP_REQUIRING_PASSPHRASE,
+                {
+                    {"amount", RPCArg::Type::AMOUNT, RPCArg::Optional::NO, "The amount in " + CURRENCY_UNIT + " to burn. eg 0.1"},
+                    {"comment", RPCArg::Type::STR, RPCArg::Optional::OMITTED_NAMED_ARG, "A comment embedded in the transaction on the blockchain.\n"
+                                         "This is part of the transaction."},
+                    {"subtractfeefromamount", RPCArg::Type::BOOL, /* default */ "false", "The fee will be deducted from the amount being burned.\n"
+                                         "The amount burned will be fewer coins than you enter in the amount field."},
+                    {"replaceable", RPCArg::Type::BOOL, /* default */ "wallet default", "Allow this transaction to be replaced by a transaction with higher fees via BIP 125"},
+                    {"conf_target", RPCArg::Type::NUM, /* default */ "wallet -txconfirmtarget", "Confirmation target in blocks"},
+                    {"estimate_mode", RPCArg::Type::STR, /* default */ "unset", std::string() + "The fee estimate mode, must be one of (case insensitive):\n"
+            "       \"" + FeeModes("\"\n\"") + "\""},
+                    {"avoid_reuse", RPCArg::Type::BOOL, /* default */ "true", "(only available if avoid_reuse wallet flag is set) Avoid spending from dirty addresses; addresses are considered\n"
+                                         "dirty if they have previously been used in a transaction."},
+                    {"fee_rate", RPCArg::Type::AMOUNT, /* default */ "not set, fall back to wallet fee estimation", "Specify a fee rate in " + CURRENCY_ATOM + "/vB."},
+                    {"verbose", RPCArg::Type::BOOL, /* default */ "false", "If true, return extra information about the transaction."},
+                },
+                {
+                    RPCResult{"if verbose is not set or set to false",
+                        RPCResult::Type::STR_HEX, "txid", "The transaction id."
+                    },
+                    RPCResult{"if verbose is set to true",
+                        RPCResult::Type::OBJ, "", "",
+                        {
+                            {RPCResult::Type::STR_HEX, "txid", "The transaction id."},
+                            {RPCResult::Type::STR, "fee reason", "The transaction fee reason."}
+                        },
+                    },
+                },
+                RPCExamples{
+                    "\nBurn 0.1 BTC\n"
+                    + HelpExampleCli("burncoins", "0.1") +
+                    "\nBurn 0.1 BTC with a confirmation target of 6 blocks in economical fee estimate mode using positional arguments\n"
+                    + HelpExampleCli("burncoins", "0.1 \"Hello world!\" false true 6 economical") +
+                    "\nBurn 0.1 BTC with a fee rate of 1.1 " + CURRENCY_ATOM + "/vB, subtract fee from amount, BIP125-replaceable, using positional arguments\n"
+                    + HelpExampleCli("burncoins", "0.1 \"Hello world!\" true true null \"unset\" null 1.1") +
+                    "\nBurn 0.2 BTC with a confirmation target of 6 blocks in economical fee estimate mode using named arguments\n"
+                    + HelpExampleCli("-named burncoins", "amount=0.2 conf_target=6 estimate_mode=\"economical\"") +
+                    "\nBurn 0.5 BTC with a fee rate of 25 " + CURRENCY_ATOM + "/vB using named arguments\n"
+                    + HelpExampleCli("-named burncoins", "amount=0.5 fee_rate=25")
+                    + HelpExampleCli("-named burncoins", "amount=0.5 fee_rate=25 subtractfeefromamount=false replaceable=true avoid_reuse=true comment=\"Hello world!\" verbose=true")
+                },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
+    if (!wallet) return NullUniValue;
+    CWallet* const pwallet = wallet.get();
+
+    // Make sure the results are valid at least up to the most recent block
+    // the user could have gotten from another RPC command prior to now
+    pwallet->BlockUntilSyncedToCurrentChain();
+
+    LOCK(pwallet->cs_wallet);
+
+    // Comment
+    mapValue_t mapValue;
+    CScript burnScript = CScript() << OP_RETURN;
+    if (!request.params[1].isNull() && !request.params[1].get_str().empty()) {
+        // We can only support a string of up to 640 characters here instead of 641 (MAX_OP_RETURN_RELAY-3) because an extra length byte is added by OP_PUSHDATA2
+        if (request.params[1].get_str().length() > MAX_OP_RETURN_RELAY - 4)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Comment cannot be longer than %u characters", MAX_OP_RETURN_RELAY - 4));
+        burnScript << ToByteVector(request.params[1].get_str());
+    }
+
+    bool fSubtractFeeFromAmount = false;
+    if (!request.params[2].isNull()) {
+        fSubtractFeeFromAmount = request.params[2].get_bool();
+    }
+
+    CCoinControl coin_control;
+    if (!request.params[3].isNull()) {
+        coin_control.m_signal_bip125_rbf = request.params[3].get_bool();
+    }
+
+    coin_control.m_avoid_address_reuse = GetAvoidReuseFlag(pwallet, request.params[6]);
+    // We also enable partial spend avoidance if reuse avoidance is set.
+    coin_control.m_avoid_partial_spends |= coin_control.m_avoid_address_reuse;
+
+    SetFeeEstimateMode(*pwallet, coin_control, /* conf_target */ request.params[4], /* estimate_mode */ request.params[5], /* fee_rate */ request.params[7], /* override_min_fee */ false);
+
+    EnsureWalletIsUnlocked(pwallet);
+
+    std::vector<CRecipient> recipients;
+    recipients.push_back(CRecipient{burnScript, AmountFromValue(request.params[0]), fSubtractFeeFromAmount});
+    const bool verbose{request.params[8].isNull() ? false : request.params[8].get_bool()};
+
+    return SendMoney(pwallet, coin_control, recipients, mapValue, verbose);
+},
+    };
+}
+
 static RPCHelpMan listaddressgroupings()
 {
     return RPCHelpMan{"listaddressgroupings",
@@ -4586,6 +4680,7 @@ static const CRPCCommand commands[] =
     { "wallet",             "send",                             &send,                          {"outputs","conf_target","estimate_mode","fee_rate","options"} },
     { "wallet",             "sendmany",                         &sendmany,                      {"dummy","amounts","minconf","comment","subtractfeefrom","replaceable","conf_target","estimate_mode","fee_rate","verbose"} },
     { "wallet",             "sendtoaddress",                    &sendtoaddress,                 {"address","amount","comment","comment_to","subtractfeefromamount","replaceable","conf_target","estimate_mode","avoid_reuse","fee_rate","verbose"} },
+    { "wallet",             "burncoins",                        &burncoins,                     {"amount","comment","subtractfeefromamount","replaceable","conf_target","estimate_mode","avoid_reuse","fee_rate","verbose"} },
     { "wallet",             "sethdseed",                        &sethdseed,                     {"newkeypool","seed"} },
     { "wallet",             "setlabel",                         &setlabel,                      {"address","label"} },
     { "wallet",             "settxfee",                         &settxfee,                      {"amount"} },
