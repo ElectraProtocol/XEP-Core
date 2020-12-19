@@ -115,10 +115,13 @@ static bool GenerateBlock(ChainstateManager& chainman, CBlock& block, uint64_t& 
     }
 
     CChainParams chainparams(Params());
+    const Consensus::Params &consensusParams = chainparams.GetConsensus();
 
-    while (max_tries > 0 && block.nNonce < std::numeric_limits<uint32_t>::max() && !CheckProofOfWork(block.GetPoWHash(), block.nBits, chainparams.GetConsensus()) && !ShutdownRequested()) {
+    while (max_tries > 0 && block.nNonce < std::numeric_limits<uint32_t>::max() && !CheckProofOfWork(block.GetPoWHash(), block.nBits, consensusParams) && !ShutdownRequested()) {
         ++block.nNonce;
         --max_tries;
+        if ((block.nNonce & 0x1ffff) == 0)
+            block.nTime = std::max((int64_t)block.nTime, GetAdjustedTime());
     }
     if (max_tries == 0 || ShutdownRequested()) {
         return false;
@@ -126,6 +129,7 @@ static bool GenerateBlock(ChainstateManager& chainman, CBlock& block, uint64_t& 
     if (block.nNonce == std::numeric_limits<uint32_t>::max()) {
         return true;
     }
+    LogPrintf("proof-of-work found\n   hash: %s\n target: %s\n   bits: %08x\n  nonce: %u\n", block.GetPoWHash().ToString(), arith_uint256().SetCompact(block.nBits).ToString(), block.nBits, block.nNonce);
 
     std::shared_ptr<const CBlock> shared_pblock = std::make_shared<const CBlock>(block);
     if (!chainman.ProcessNewBlock(chainparams, shared_pblock, true, nullptr)) {
@@ -274,7 +278,7 @@ static RPCHelpMan generatetoaddress()
         [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
 {
     const int num_blocks{request.params[0].get_int()};
-    const uint64_t max_tries{request.params[2].isNull() ? DEFAULT_MAX_TRIES : request.params[2].get_int()};
+    const uint64_t max_tries{request.params[2].isNull() ? DEFAULT_MAX_TRIES : request.params[2].get_int64()};
 
     CTxDestination destination = DecodeDestination(request.params[1].get_str());
     if (!IsValidDestination(destination)) {
