@@ -855,7 +855,7 @@ static RPCHelpMan getblocktemplate()
             }
         }
     }
-    result.pushKV("version", pblock->nVersion);
+    result.pushKV("version", (uint64_t)pblock->nVersion);
     result.pushKV("rules", aRules);
     result.pushKV("vbavailable", vbavailable);
     result.pushKV("vbrequired", int(0));

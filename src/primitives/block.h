@@ -1,5 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2018-2020 John "ComputerCraftr" Studnicka
+// Copyright (c) 2018-2020 The Simplicity developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -21,7 +23,8 @@ class CBlockHeader
 {
 public:
     // header
-    int32_t nVersion;
+    static const uint32_t FIRST_FORK_VERSION = 5;
+    uint32_t nVersion;
     uint256 hashPrevBlock;
     uint256 hashMerkleRoot;
     uint32_t nTime;
@@ -48,6 +51,55 @@ public:
     bool IsNull() const
     {
         return (nBits == 0);
+    }
+
+    // peercoin: two types of block: proof-of-work or proof-of-stake
+    bool IsProofOfStake() const
+    {
+        // nNonce == 0 for PoS blocks
+        return (nVersion & VERSION_ALGO) == VERSION_POS || (nVersion < FIRST_FORK_VERSION && nNonce == 0);
+    }
+
+    bool IsProofOfWork() const
+    {
+        return (nVersion & VERSION_POW) || (nVersion < FIRST_FORK_VERSION && nNonce != 0);
+    }
+
+    enum BlockType {
+        ALGO_POS = 0,
+        ALGO_POW_SHA256 = 1,
+        ALGO_COUNT
+    };
+
+    enum AlgoFlags {
+        VERSION_POS = 1<<29,
+        VERSION_POW_SHA256 = 2<<29,
+        VERSION_ALGO = 7<<29,
+        VERSION_POW = 6<<29
+    };
+
+    static int GetAlgo(int version)
+    {
+        switch (version & VERSION_ALGO) {
+            case VERSION_POS:
+                return ALGO_POS;
+            case VERSION_POW_SHA256:
+                return ALGO_POW_SHA256;
+            default:
+                return -1;
+        }
+    }
+
+    static uint32_t GetVer(int algo)
+    {
+        switch (algo) {
+            case ALGO_POS:
+                return VERSION_POS;
+            case ALGO_POW_SHA256:
+                return VERSION_POW_SHA256;
+            default:
+                return FIRST_FORK_VERSION;
+        }
     }
 
     uint256 GetHash() const;
