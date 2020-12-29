@@ -25,11 +25,20 @@ namespace Consensus { struct Params; };
 
 static const bool DEFAULT_PRINTPRIORITY = false;
 
+struct CBlockTemplateEntry
+{
+    CTransactionRef tx;
+    CAmount fees;
+    int64_t sigOpsCost;
+
+    CBlockTemplateEntry(CTransactionRef _tx, CAmount _fees, int64_t _sigOpsCost)
+        : tx(_tx), fees(_fees), sigOpsCost(_sigOpsCost){};
+};
+
 struct CBlockTemplate
 {
     CBlock block;
-    std::vector<CAmount> vTxFees;
-    std::vector<int64_t> vTxSigOpsCost;
+    std::vector<CBlockTemplateEntry> entries;
     std::vector<unsigned char> vchCoinbaseCommitment;
 };
 

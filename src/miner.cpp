@@ -112,9 +112,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     CBlock* const pblock = &pblocktemplate->block; // pointer for convenience
 
     // Add dummy coinbase tx as first transaction
-    pblock->vtx.emplace_back();
-    pblocktemplate->vTxFees.push_back(-1); // updated at end
-    pblocktemplate->vTxSigOpsCost.push_back(-1); // updated at end
+    pblocktemplate->entries.emplace_back(CTransactionRef(), -1, -1); // updated at end
 
     LOCK2(cs_main, m_mempool.cs);
     CBlockIndex* pindexPrev = ::ChainActive().Tip();
@@ -151,6 +149,28 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     int nDescendantsUpdated = 0;
     addPackageTxs(nPackagesSelected, nDescendantsUpdated);
 
+    // Ensure that transactions are canonically ordered - FIX ME: need to account for unconfirmed TX chains
+    //const bool fProofOfStake = false;
+    /*std::sort(std::begin(pblocktemplate->entries) + (fProofOfStake ? 2 : 1),
+            std::end(pblocktemplate->entries),
+            [](const CBlockTemplateEntry &a, const CBlockTemplateEntry &b) -> bool {
+                const uint256 &txbHash = b.tx->GetHash();
+                bool txbIsInput = false;
+                for (const CTxIn &vin : a.tx->vin) {
+                    if (vin.prevout.hash == txbHash) {
+                        txbIsInput = true; // one of a.tx's inputs is b.tx, so we cannot put a.tx before b.tx in the block (topological order must be kept)
+                        break;
+                    }
+                }
+                return !txbIsInput && UintToArith256(a.tx->GetWitnessHash()) < UintToArith256(b.tx->GetWitnessHash());
+            });*/
+
+    // Copy all the transactions refs into the block
+    pblock->vtx.reserve(pblocktemplate->entries.size());
+    for (const CBlockTemplateEntry &entry : pblocktemplate->entries) {
+        pblock->vtx.push_back(entry.tx);
+    }
+
     int64_t nTime1 = GetTimeMicros();
 
     m_last_block_num_txs = nBlockTx;
@@ -164,9 +184,10 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     coinbaseTx.vout[0].scriptPubKey = scriptPubKeyIn;
     coinbaseTx.vout[0].nValue = nFees + GetBlockSubsidy(nHeight, consensusParams);
     coinbaseTx.vin[0].scriptSig = CScript() << nHeight << OP_0;
-    pblock->vtx[0] = MakeTransactionRef(std::move(coinbaseTx));
+    pblocktemplate->entries[0].tx = MakeTransactionRef(std::move(coinbaseTx));
+    pblock->vtx[0] = pblocktemplate->entries[0].tx;
     pblocktemplate->vchCoinbaseCommitment = GenerateCoinbaseCommitment(*pblock, pindexPrev, consensusParams);
-    pblocktemplate->vTxFees[0] = -nFees;
+    pblocktemplate->entries[0].fees = -nFees;
 
     LogPrintf("CreateNewBlock(): block weight: %u txs: %u fees: %ld sigops %d\n", GetBlockWeight(*pblock), nBlockTx, nFees, nBlockSigOpsCost);
 
@@ -175,7 +196,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     UpdateTime(pblock, consensusParams, pindexPrev);
     pblock->nBits          = GetNextWorkRequired(pindexPrev, pblock, consensusParams);
     pblock->nNonce         = 0;
-    pblocktemplate->vTxSigOpsCost[0] = WITNESS_SCALE_FACTOR * GetLegacySigOpCount(*pblock->vtx[0]);
+    pblocktemplate->entries[0].sigOpsCost = WITNESS_SCALE_FACTOR * GetLegacySigOpCount(*pblock->vtx[0]);
 
     BlockValidationState state;
     if (!TestBlockValidity(state, chainparams, *pblock, pindexPrev, false, false)) {
@@ -228,9 +249,7 @@ bool BlockAssembler::TestPackageTransactions(const CTxMemPool::setEntries& packa
 
 void BlockAssembler::AddToBlock(CTxMemPool::txiter iter)
 {
-    pblocktemplate->block.vtx.emplace_back(iter->GetSharedTx());
-    pblocktemplate->vTxFees.push_back(iter->GetFee());
-    pblocktemplate->vTxSigOpsCost.push_back(iter->GetSigOpCost());
+    pblocktemplate->entries.emplace_back(iter->GetSharedTx(), iter->GetFee(), iter->GetSigOpCost());
     nBlockWeight += iter->GetTxWeight();
     ++nBlockTx;
     nBlockSigOpsCost += iter->GetSigOpCost();

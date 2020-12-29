@@ -3559,9 +3559,45 @@ static bool ContextualCheckBlock(const CBlock& block, BlockValidationState& stat
                               ? pindexPrev->GetMedianTimePast()
                               : block.GetBlockTime();
 
-    // Check that all transactions are finalized
-    for (const auto& tx : block.vtx) {
-        if (!IsFinalTx(*tx, nHeight, nLockTimeCutoff)) {
+    // Check that all transactions are canonically ordered and finalized
+    const bool fEnforceCTOR = false;
+    const CTransaction *prevTx = nullptr;
+    for (const auto &ptx : block.vtx) {
+        const CTransaction &tx = *ptx;
+        if (fEnforceCTOR) {
+            if (prevTx) {
+                const uint256 &txWitHash = tx.GetWitnessHash(), &prevTxWitHash = prevTx->GetWitnessHash(), &prevTxHash = prevTx->GetHash();
+                if (tx.GetHash() == prevTxHash) {
+                    return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "tx-duplicate",
+                                     strprintf("Duplicated transaction %s",
+                                               prevTxHash.ToString()));
+                }
+
+                bool prevTxIsInput = false;
+                for (const CTxIn &vin : tx.vin) {
+                    if (vin.prevout.hash == prevTxHash) {
+                        prevTxIsInput = true;
+                        break;
+                    }
+                }
+                if (!prevTxIsInput && UintToArith256(txWitHash) < UintToArith256(prevTxWitHash)) {
+                    return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "tx-ordering",
+                        strprintf("Transaction order is invalid (%s < %s)",
+                                  txWitHash.ToString(),
+                                  prevTxWitHash.ToString()));
+                }
+                //if (prevTxIsInput)
+                    //LogPrintf("Transaction %s with witness hash %s is an input of transaction %s with witness hash %s\n", prevTxHash.ToString(), prevTxWitHash.ToString(), tx.GetHash().ToString(), txWitHash.ToString());
+                //else
+                    //LogPrintf("Transaction %s has witness hash %s which is greater than transaction %s with witness hash %s\n", tx.GetHash().ToString(), txWitHash.ToString(), prevTxHash.ToString(), prevTxWitHash.ToString());
+            }
+
+            if (prevTx || (!tx.IsCoinBase() /*&& !tx.IsCoinStake()*/)) {
+                prevTx = &tx;
+            }
+        }
+
+        if (!IsFinalTx(tx, nHeight, nLockTimeCutoff)) {
             return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-txns-nonfinal", "non-final transaction");
         }
     }
