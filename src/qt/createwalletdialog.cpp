@@ -51,6 +51,8 @@ CreateWalletDialog::CreateWalletDialog(QWidget* parent) :
         }
     });
 
+        ui->encrypt_wallet_checkbox->setChecked(true);
+
 #ifndef USE_SQLITE
         ui->descriptor_checkbox->setToolTip(tr("Compiled without sqlite support (required for descriptor wallets)"));
         ui->descriptor_checkbox->setEnabled(false);
