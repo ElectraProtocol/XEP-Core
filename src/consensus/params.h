@@ -6,8 +6,11 @@
 #ifndef BITCOIN_CONSENSUS_PARAMS_H
 #define BITCOIN_CONSENSUS_PARAMS_H
 
+#include <primitives/block.h>
+#include <script/script.h>
 #include <uint256.h>
 #include <limits>
+#include <map>
 
 namespace Consensus {
 
@@ -46,6 +49,12 @@ struct BIP9Deployment {
 struct Params {
     uint256 hashGenesisBlock;
     int nSubsidyHalvingInterval;
+    int nBudgetPaymentsStartBlock;
+    int nPoSStartBlock;
+    int nLastPoWBlock;
+    int nTreasuryPaymentsStartBlock;
+    int nTreasuryPaymentsCycleBlocks;
+    std::map<CScript, int> mTreasuryPayees;
     /* Block hash that is excepted from BIP16 enforcement */
     uint256 BIP16Exception;
     /** Block height and hash at which BIP34 becomes active */
@@ -90,6 +99,13 @@ struct Params {
      */
     bool signet_blocks{false};
     std::vector<uint8_t> signet_challenge;
+
+    /** peercoin stuff */
+    int nStakeTimestampMask;
+    int nStakeMinDepth;
+    int64_t nStakeMinAge;
+    int64_t nStakeMaxAge;
+    int64_t nModifierInterval;
 };
 } // namespace Consensus
 

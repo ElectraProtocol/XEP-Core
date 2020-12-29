@@ -55,6 +55,11 @@ public:
     const unsigned char* data() const { return m_data; }
     unsigned char* data() { return m_data; }
 
+    const uint32_t *GetDataPtr() const
+    {
+        return (const uint32_t *)m_data;
+    }
+
     unsigned char* begin()
     {
         return &m_data[0];

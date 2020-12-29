@@ -271,7 +271,18 @@ bool CBlockTreeDB::LoadBlockIndexGuts(const Consensus::Params& consensusParams, 
                 pindexNew->nStatus        = diskindex.nStatus;
                 pindexNew->nTx            = diskindex.nTx;
 
-                if (!CheckProofOfWork(pindexNew->GetBlockHeader().GetPoWHash(), pindexNew->nBits, consensusParams))
+                // peercoin related block index fields
+                pindexNew->nMint          = diskindex.nMint;
+                pindexNew->nMoneySupply   = diskindex.nMoneySupply;
+                pindexNew->nFlags         = diskindex.nFlags;
+                pindexNew->nStakeModifier = diskindex.nStakeModifier;
+                pindexNew->nStakeModifierV2 = diskindex.nStakeModifierV2;
+                pindexNew->nTreasuryPayment = diskindex.nTreasuryPayment;
+                //pindexNew->prevoutStake   = diskindex.prevoutStake;
+                //pindexNew->nStakeTime     = diskindex.nStakeTime;
+                //pindexNew->hashProofOfStake = diskindex.hashProofOfStake;
+
+                if (pindexNew->IsProofOfWork() && !CheckProofOfWork(pindexNew->GetBlockHeader().GetPoWHash(), pindexNew->nBits, consensusParams))
                     return error("%s: CheckProofOfWork failed: %s", __func__, pindexNew->ToString());
 
                 pcursor->Next();

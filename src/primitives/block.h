@@ -118,6 +118,9 @@ public:
     // network and disk
     std::vector<CTransactionRef> vtx;
 
+    // peercoin: block signature - signed by coin base txout[0]'s owner
+    std::vector<unsigned char> vchBlockSig;
+
     // memory only
     mutable bool fChecked;
 
@@ -136,6 +139,8 @@ public:
     {
         READWRITEAS(CBlockHeader, obj);
         READWRITE(obj.vtx);
+        if (obj.vtx.size() > 1 && obj.vtx[1]->IsCoinStake())
+            READWRITE(obj.vchBlockSig);
     }
 
     void SetNull()
@@ -143,6 +148,7 @@ public:
         CBlockHeader::SetNull();
         vtx.clear();
         fChecked = false;
+        vchBlockSig.clear();
     }
 
     CBlockHeader GetBlockHeader() const
@@ -156,6 +162,17 @@ public:
         block.nNonce         = nNonce;
         return block;
     }
+
+    // peercoin: two types of block: proof-of-work or proof-of-stake
+    /*bool IsProofOfStake() const
+    {
+        return (vtx.size() > 1 && vtx[1]->IsCoinStake());
+    }
+
+    bool IsProofOfWork() const
+    {
+        return !IsProofOfStake();
+    }*/
 
     std::string ToString() const;
 };

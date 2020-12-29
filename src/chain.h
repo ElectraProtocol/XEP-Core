@@ -13,6 +13,8 @@
 #include <tinyformat.h>
 #include <uint256.h>
 
+#include <util/moneystr.h>
+
 #include <vector>
 
 /**
@@ -186,6 +188,92 @@ public:
     //! (memory only) Maximum nTime in the chain up to and including this block.
     unsigned int nTimeMax{0};
 
+// peercoin
+    // peercoin: money supply related block index fields
+    int64_t nMint{0};
+    int64_t nMoneySupply{0};
+    int64_t nTreasuryPayment{0};
+
+    // peercoin: proof-of-stake related block index fields
+    unsigned int nFlags{0};  // peercoin: block index flags
+    enum
+    {
+        BLOCK_PROOF_OF_STAKE = (1 << 0), // is proof-of-stake block
+        BLOCK_STAKE_ENTROPY  = (1 << 1), // entropy bit for stake modifier
+        BLOCK_STAKE_MODIFIER = (1 << 2), // regenerated stake modifier
+        BLOCK_STAKE_MOD_V2   = (1 << 3), // uses nStakeModifierV2
+        BLOCK_TREASURY_AWARD = (1 << 4), // is treasury payment block
+    };
+    uint64_t nStakeModifier{0}; // hash modifier for proof-of-stake
+    uint256 nStakeModifierV2{}; // hash modifier for proof-of-stake
+    //unsigned int nStakeModifierChecksum{0}; // checksum of index; in-memory only
+    //COutPoint prevoutStake{};
+    //unsigned int nStakeTime{0};
+    //uint256 hashProofOfStake{};
+
+    bool IsProofOfWork() const
+    {
+        return !(nFlags & BLOCK_PROOF_OF_STAKE);
+    }
+
+    bool IsProofOfStake() const
+    {
+        return (nFlags & BLOCK_PROOF_OF_STAKE);
+    }
+
+    void SetProofOfStake()
+    {
+        nFlags |= BLOCK_PROOF_OF_STAKE;
+    }
+
+    unsigned int GetStakeEntropyBit() const
+    {
+        return ((nFlags & BLOCK_STAKE_ENTROPY) >> 1);
+    }
+
+    bool SetStakeEntropyBit(unsigned int nEntropyBit)
+    {
+        if (nEntropyBit > 1)
+            return false;
+        nFlags |= (nEntropyBit ? BLOCK_STAKE_ENTROPY : 0);
+        return true;
+    }
+
+    bool GeneratedStakeModifier() const
+    {
+        return (nFlags & BLOCK_STAKE_MODIFIER);
+    }
+
+    bool UsesStakeModifierV2() const
+    {
+        return (nFlags & BLOCK_STAKE_MOD_V2);
+    }
+
+    void SetStakeModifier(uint64_t nModifier, bool fGeneratedStakeModifier)
+    {
+        nStakeModifier = nModifier;
+        if (fGeneratedStakeModifier)
+            nFlags |= BLOCK_STAKE_MODIFIER;
+    }
+
+    void SetStakeModifierV2(uint256 nModifier, bool fGeneratedStakeModifier)
+    {
+        nStakeModifierV2 = nModifier;
+        if (fGeneratedStakeModifier)
+            nFlags |= BLOCK_STAKE_MODIFIER | BLOCK_STAKE_MOD_V2;
+    }
+// peercoin end
+
+    bool IsTreasuryBlock() const
+    {
+        return (nFlags & BLOCK_TREASURY_AWARD);
+    }
+
+    void SetTreasuryBlock()
+    {
+        nFlags |= BLOCK_TREASURY_AWARD;
+    }
+
     CBlockIndex()
     {
     }
@@ -272,8 +360,11 @@ public:
 
     std::string ToString() const
     {
-        return strprintf("CBlockIndex(pprev=%p, nHeight=%d, merkle=%s, hashBlock=%s)",
-            pprev, nHeight,
+        return strprintf("CBlockIndex(pprev=%p, nFile=%d, nHeight=%d, nMint=%s, nMoneySupply=%s, nFlags=(%s)(%d)(%s)(%s)(%u), nStakeModifier=%016llx, merkle=%s, hashBlock=%s)",
+            pprev, nFile, nHeight,
+            FormatMoney(nMint), FormatMoney(nMoneySupply),
+            GeneratedStakeModifier() ? "MOD" : "-", GetStakeEntropyBit(), IsProofOfStake() ? "PoS" : "PoW", UsesStakeModifierV2() ? "V2" : "V1", IsTreasuryBlock(),
+            nStakeModifier,
             hashMerkleRoot.ToString(),
             GetBlockHash().ToString());
     }
@@ -341,6 +432,23 @@ public:
         if (obj.nStatus & (BLOCK_HAVE_DATA | BLOCK_HAVE_UNDO)) READWRITE(VARINT_MODE(obj.nFile, VarIntMode::NONNEGATIVE_SIGNED));
         if (obj.nStatus & BLOCK_HAVE_DATA) READWRITE(VARINT(obj.nDataPos));
         if (obj.nStatus & BLOCK_HAVE_UNDO) READWRITE(VARINT(obj.nUndoPos));
+
+        READWRITE(obj.nMint);
+        READWRITE(obj.nMoneySupply);
+        READWRITE(obj.nFlags);
+        if (obj.UsesStakeModifierV2()) {
+            READWRITE(obj.nStakeModifierV2);
+        } else {
+            READWRITE(obj.nStakeModifier);
+        }
+        if (obj.IsTreasuryBlock()) {
+            READWRITE(obj.nTreasuryPayment);
+        }
+        /*if (obj.IsProofOfStake()) {
+            READWRITE(obj.prevoutStake);
+            READWRITE(obj.nStakeTime);
+            READWRITE(obj.hashProofOfStake);
+        }*/
 
         // block header
         READWRITE(obj.nVersion);
