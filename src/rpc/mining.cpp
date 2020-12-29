@@ -116,8 +116,9 @@ static bool GenerateBlock(ChainstateManager& chainman, CBlock& block, uint64_t& 
 
     CChainParams chainparams(Params());
     const Consensus::Params &consensusParams = chainparams.GetConsensus();
+    const int algo = CBlockHeader::GetAlgo(block.nVersion);
 
-    while (max_tries > 0 && block.nNonce < std::numeric_limits<uint32_t>::max() && !CheckProofOfWork(block.GetPoWHash(), block.nBits, consensusParams) && !ShutdownRequested()) {
+    while (max_tries > 0 && block.nNonce < std::numeric_limits<uint32_t>::max() && !CheckProofOfWork(block.GetPoWHash(), block.nBits, algo, consensusParams) && !ShutdownRequested()) {
         ++block.nNonce;
         --max_tries;
         if ((block.nNonce & 0x1ffff) == 0)
