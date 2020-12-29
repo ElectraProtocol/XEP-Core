@@ -1241,16 +1241,20 @@ CAmount GetBlockSubsidy(int nHeight, bool fProofOfStake, uint64_t nCoinAge, cons
 {
     if (nHeight < 0) return 0;
 
+    CAmount nSubsidy = 0;
+    CAmount nRewardCoinYear = COIN / 100; // this is 1% APR interest by default (compounded once per stake); for every 100 coins held for a year, the reward when staked should be 1 coin (rewards increase proportionally with larger money supply/more coins staking)
     const CAmount nMoneySupply = (nHeight > 0 && ::ChainActive().Tip()) ? (::ChainActive()[nHeight-1] ? ::ChainActive()[nHeight-1]->nMoneySupply : ::ChainActive().Tip()->nMoneySupply) : 0; // the previous block's money supply should probably be passed to this function instead of retrieving it here
 
-    int halvings = nHeight / consensusParams.nSubsidyHalvingInterval;
-    // Force block reward to zero when right shift is undefined.
-    if (halvings >= 64)
-        return 0;
+    if (fProofOfStake) {
+        nRewardCoinYear *= 3; // 3% interest (effective rate with continuous compounding is exp(0.03) - 1 = 3.045%)
 
-    CAmount nSubsidy = 50 * COIN;
-    // Subsidy is cut in half every 210,000 blocks which will occur approximately every 4 years.
-    nSubsidy >>= halvings;
+        nSubsidy = nCoinAge * nRewardCoinYear * 33 / (365 * 33 + 8); // this is a more accurate approximation of the number of days in a year than 365.25, being equivalent to dividing by (365 + 8.0/33) or 365.24242424... (keep in mind the integer division)
+    } else {
+        if (nHeight == 0) // premine
+            nSubsidy = 30000000000 * COIN; // 30 billion
+        else
+            nSubsidy = 1 * COIN;
+    }
 
     if ((unsigned)nHeight >= consensusParams.nMinerConfirmationWindow) {
         if (nMoneySupply + nSubsidy > MAX_MONEY) // soft supply cap (this will essentially put us into static PoW/PoS rewards)
