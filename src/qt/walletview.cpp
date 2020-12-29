@@ -308,6 +308,14 @@ void WalletView::unlockWallet()
     }
 }
 
+void WalletView::lockWallet()
+{
+    if (!walletModel)
+        return;
+
+    walletModel->setWalletLocked(true);
+}
+
 void WalletView::usedSendingAddresses()
 {
     if(!walletModel)
