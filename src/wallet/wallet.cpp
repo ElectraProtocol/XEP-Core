@@ -883,6 +883,10 @@ CWalletTx* CWallet::AddToWallet(CTransactionRef tx, const CWalletTx::Confirmatio
             wtx.m_confirm.nIndex = confirm.nIndex;
             wtx.m_confirm.hashBlock = confirm.hashBlock;
             wtx.m_confirm.block_height = confirm.block_height;
+            if (tx->IsCoinStake() && wtx.isUnconfirmed()) {
+                WalletLogPrintf("Abandoning orphaned coinstake %s\n", hash.ToString());
+                AbandonTransaction(hash);
+            }
             fUpdated = true;
         } else {
             assert(wtx.m_confirm.nIndex == confirm.nIndex);
@@ -4596,4 +4600,68 @@ ScriptPubKeyMan* CWallet::AddWalletDescriptor(WalletDescriptor& desc, const Flat
     ret->WriteDescriptor();
 
     return ret;
+}
+
+bool CWallet::SelectStakeCoins(std::set<CInputCoin>& setCoins) const
+{
+    AssertLockHeld(cs_wallet);
+
+    // Choose coins to use
+    CAmount nBalance = GetBalance().m_mine_trusted;
+    CAmount nValueIn = 0;
+    std::vector<COutput> vAvailableCoins;
+    CCoinControl temp;
+    CoinSelectionParams coin_selection_params;
+    coin_selection_params.use_bnb=false;
+    bool bnb_used;
+    AvailableCoins(vAvailableCoins, true, &temp, 1, MAX_MONEY, MAX_MONEY, 0);
+
+    if (!SelectCoins(vAvailableCoins, nBalance, setCoins, nValueIn, temp, coin_selection_params, bnb_used))
+        return false;
+    if (setCoins.empty())
+        return false;
+
+    return true;
+}
+
+// peercoin: sign block
+bool CWallet::SignBlock(CBlock& block) const
+{
+    AssertLockHeld(cs_wallet);
+
+    const bool fProofOfStake = block.IsProofOfStake();
+    std::vector<std::vector<unsigned char>> vSolutions;
+    const CTxOut& txout = fProofOfStake ? block.vtx[1]->vout[1] : block.vtx[0]->vout[0];
+    CScript scriptPubKey;
+    if (fProofOfStake) {
+        const COutPoint& prevout = block.vtx[1]->vin[0].prevout;
+        const CWalletTx* const origwtx = GetWalletTx(prevout.hash);
+        if (origwtx && origwtx->tx)
+            scriptPubKey = origwtx->tx->vout[prevout.n].scriptPubKey;
+        else
+            return false;
+    } else {
+        scriptPubKey = txout.scriptPubKey;
+    }
+    TxoutType whichType = Solver(scriptPubKey, vSolutions);
+
+    // Sign
+    const std::vector<unsigned char>& vchPubKey = vSolutions[0];
+    CPubKey pubkey;
+    if (whichType == TxoutType::PUBKEY) {
+        pubkey = CPubKey(vchPubKey);
+    } else if (whichType == TxoutType::PUBKEYHASH || whichType == TxoutType::WITNESS_V0_KEYHASH) {
+        std::unique_ptr<SigningProvider> provider = GetSolvingProvider(scriptPubKey);
+        if (!provider || !provider->GetPubKey(CKeyID(uint160(vchPubKey)), pubkey))
+            return false;
+    } else {
+        return false;
+    }
+
+    // Try to sign with all ScriptPubKeyMans
+    for (ScriptPubKeyMan* spk_man : GetAllScriptPubKeyMans()) {
+        if (spk_man->SignBlock(block, pubkey) == SigningResult::OK)
+            return true;
+    }
+    return false;
 }

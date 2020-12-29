@@ -592,6 +592,19 @@ SigningResult LegacyScriptPubKeyMan::SignMessage(const std::string& message, con
     return SigningResult::SIGNING_FAILED;
 }
 
+SigningResult LegacyScriptPubKeyMan::SignBlock(CBlock& block, const CPubKey& pubkey) const
+{
+    CKey key;
+    if (!GetKey(pubkey.GetID(), key)) {
+        return SigningResult::PRIVATE_KEY_NOT_AVAILABLE;
+    }
+
+    if (key.Sign(block.GetHash(), block.vchBlockSig, 0)) {
+        return SigningResult::OK;
+    }
+    return SigningResult::SIGNING_FAILED;
+}
+
 TransactionError LegacyScriptPubKeyMan::FillPSBT(PartiallySignedTransaction& psbtx, int sighash_type, bool sign, bool bip32derivs, int* n_signed) const
 {
     if (n_signed) {
@@ -2073,6 +2086,24 @@ SigningResult DescriptorScriptPubKeyMan::SignMessage(const std::string& message,
     }
 
     if (!MessageSign(key, message, str_sig)) {
+        return SigningResult::SIGNING_FAILED;
+    }
+    return SigningResult::OK;
+}
+
+SigningResult DescriptorScriptPubKeyMan::SignBlock(CBlock& block, const CPubKey& pubkey) const
+{
+    std::unique_ptr<FlatSigningProvider> keys = GetSigningProvider(pubkey);
+    if (!keys) {
+        return SigningResult::PRIVATE_KEY_NOT_AVAILABLE;
+    }
+
+    CKey key;
+    if (!keys->GetKey(pubkey.GetID(), key)) {
+        return SigningResult::PRIVATE_KEY_NOT_AVAILABLE;
+    }
+
+    if (!key.Sign(block.GetHash(), block.vchBlockSig, 0)) {
         return SigningResult::SIGNING_FAILED;
     }
     return SigningResult::OK;

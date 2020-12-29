@@ -16,6 +16,7 @@ static Mutex g_warnings_mutex;
 static bilingual_str g_misc_warnings GUARDED_BY(g_warnings_mutex);
 static bool fLargeWorkForkFound GUARDED_BY(g_warnings_mutex) = false;
 static bool fLargeWorkInvalidChainFound GUARDED_BY(g_warnings_mutex) = false;
+std::string strMintWarning;
 
 void SetMiscWarning(const bilingual_str& warning)
 {
@@ -51,6 +52,12 @@ bilingual_str GetWarnings(bool verbose)
     // Pre-release build warning
     if (!CLIENT_VERSION_IS_RELEASE) {
         warnings_concise = _("This is a pre-release test build - use at your own risk - do not use for mining or merchant applications");
+        warnings_verbose.emplace_back(warnings_concise);
+    }
+
+    // peercoin: wallet lock warning for minting
+    if (!strMintWarning.empty()) {
+        warnings_concise = Untranslated(strMintWarning);
         warnings_verbose.emplace_back(warnings_concise);
     }
 

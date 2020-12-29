@@ -59,6 +59,7 @@
 #include <util/threadnames.h>
 #include <util/translation.h>
 #include <validation.h>
+#include <wallet/wallet.h>
 
 #include <validationinterface.h>
 #include <walletinitinterface.h>
@@ -564,6 +565,7 @@ void SetupServerArgs(NodeContext& node)
     argsman.AddArg("-blockmaxweight=<n>", strprintf("Set maximum BIP141 block weight (default: %d)", DEFAULT_BLOCK_MAX_WEIGHT), ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
     argsman.AddArg("-blockmintxfee=<amt>", strprintf("Set lowest fee rate (in %s/kB) for transactions to be included in block creation. (default: %s)", CURRENCY_UNIT, FormatMoney(DEFAULT_BLOCK_MIN_TX_FEE)), ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
     argsman.AddArg("-blockversion=<n>", "Override block version to test forking scenarios", ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::BLOCK_CREATION);
+    argsman.AddArg("-nostaking", "Disable staking of PoS blocks", ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
 
     argsman.AddArg("-rest", strprintf("Accept public REST requests (default: %u)", DEFAULT_REST_ENABLE), ArgsManager::ALLOW_ANY, OptionsCategory::RPC);
     argsman.AddArg("-rpcallowip=<ip>", "Allow JSON-RPC connections from specified source. Valid for <ip> are a single IP (e.g. 1.2.3.4), a network/netmask (e.g. 1.2.3.4/255.255.255.0) or a network/CIDR (e.g. 1.2.3.4/24). This option can be specified multiple times", ArgsManager::ALLOW_ANY, OptionsCategory::RPC);
@@ -586,6 +588,15 @@ void SetupServerArgs(NodeContext& node)
 #else
     hidden_args.emplace_back("-daemon");
 #endif
+
+    // peercoin parameters
+    argsman.AddArg("-printstakemodifier", "Print stakemodifier selection parameters if debug is enabled", ArgsManager::ALLOW_BOOL, OptionsCategory::DEBUG_TEST);
+    argsman.AddArg("-printcoinstake", "Print coinstake if debug is enabled", ArgsManager::ALLOW_BOOL, OptionsCategory::DEBUG_TEST);
+    argsman.AddArg("-printcoinage", "Print coinage if debug is enabled", ArgsManager::ALLOW_BOOL, OptionsCategory::DEBUG_TEST);
+    argsman.AddArg("-printcreation", "Print coin creation if debug is enabled", ArgsManager::ALLOW_BOOL, OptionsCategory::DEBUG_TEST);
+
+    argsman.AddArg("-staking", "Enable staking (default: true)", ArgsManager::ALLOW_BOOL, OptionsCategory::OPTIONS);
+    argsman.AddArg("-quantumsafestaking", "Enable quantum computer resistant staking which does not reuse addresses with exposed public keys (default: false)", ArgsManager::ALLOW_BOOL, OptionsCategory::OPTIONS);
 
     // Add the hidden options
     argsman.AddHiddenArgs(hidden_args);
@@ -2018,6 +2029,10 @@ bool AppInitMain(const util::Ref& context, NodeContext& node, interfaces::BlockA
     node.scheduler->scheduleEvery([banman]{
         banman->DumpBanlist();
     }, DUMP_BANS_INTERVAL);
+
+    std::vector<std::shared_ptr<CWallet>> wallets = GetWallets();
+    if (wallets.size() && wallets[0])
+        MintStake(threadGroup, wallets[0], node.chainman, node.connman.get(), node.mempool.get());
 
 #if HAVE_SYSTEM
     StartupNotify(args);
