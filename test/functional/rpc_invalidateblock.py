@@ -4,14 +4,14 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test the invalidateblock RPC."""
 
-from test_framework.test_framework import BitcoinTestFramework
+from test_framework.test_framework import XEPTestFramework
 from test_framework.address import ADDRESS_BCRT1_UNSPENDABLE_DESCRIPTOR
 from test_framework.util import (
     assert_equal,
 )
 
 
-class InvalidateTest(BitcoinTestFramework):
+class InvalidateTest(XEPTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 3

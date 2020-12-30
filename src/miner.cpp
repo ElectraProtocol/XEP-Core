@@ -661,7 +661,7 @@ static inline bool ProcessBlockFound(const CBlock* pblock, const CChainParams& c
     {
         LOCK(cs_main);
         if (pblock->hashPrevBlock != ::ChainActive().Tip()->GetBlockHash())
-            return error("BitcoinMiner: generated block is stale");
+            return error("XEPMiner: generated block is stale");
     }
 
     // Process this block the same as if we had received it from another node
@@ -675,7 +675,7 @@ static inline bool ProcessBlockFound(const CBlock* pblock, const CChainParams& c
 static inline void PoSMiner(std::shared_ptr<CWallet> pwallet, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool)
 {
     LogPrintf("CPUMiner started for proof-of-stake\n");
-    util::ThreadRename("bitcoin-stake-minter");
+    util::ThreadRename("xep-stake-minter");
 
     unsigned int nExtraNonce = 0;
 
@@ -767,7 +767,7 @@ static inline void PoSMiner(std::shared_ptr<CWallet> pwallet, ChainstateManager*
                 }
                 strMintWarning = strMintBlockMessage;
                 uiInterface.NotifyAlertChanged();
-                LogPrintf("Error in BitcoinMiner: Keypool ran out, please call keypoolrefill before restarting the staking thread\n");
+                LogPrintf("Error in XEPMiner: Keypool ran out, please call keypoolrefill before restarting the staking thread\n");
                 if (!connman->interruptNet.sleep_for(std::chrono::seconds(10)))
                    return;
 
@@ -795,11 +795,11 @@ static inline void PoSMiner(std::shared_ptr<CWallet> pwallet, ChainstateManager*
             continue;
         }
     } catch (boost::thread_interrupted) {
-        LogPrintf("BitcoinMiner terminated\n");
+        LogPrintf("XEPMiner terminated\n");
         return;
         // throw;
     } catch (const std::runtime_error &e) {
-        LogPrintf("BitcoinMiner runtime error: %s\n", e.what());
+        LogPrintf("XEPMiner runtime error: %s\n", e.what());
         return;
     }
 }

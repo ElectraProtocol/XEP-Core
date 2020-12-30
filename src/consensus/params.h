@@ -94,7 +94,7 @@ struct Params {
     uint256 defaultAssumeValid;
 
     /**
-     * If true, witness commitments contain a payload equal to a Bitcoin Script solution
+     * If true, witness commitments contain a payload equal to a XEP Script solution
      * to the signet challenge. See BIP325.
      */
     bool signet_blocks{false};

@@ -11,7 +11,7 @@ from test_framework.blocktools import create_coinbase, create_block, create_tran
 from test_framework.messages import msg_block
 from test_framework.p2p import P2PInterface
 from test_framework.script import CScript
-from test_framework.test_framework import BitcoinTestFramework
+from test_framework.test_framework import XEPTestFramework
 from test_framework.util import (
     assert_equal,
 )
@@ -36,7 +36,7 @@ def unDERify(tx):
     tx.vin[0].scriptSig = CScript(newscript)
 
 
-class BIP66Test(BitcoinTestFramework):
+class BIP66Test(XEPTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.extra_args = [[

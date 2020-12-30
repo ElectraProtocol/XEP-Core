@@ -5,14 +5,14 @@
 """Test createwallet arguments.
 """
 
-from test_framework.test_framework import BitcoinTestFramework
+from test_framework.test_framework import XEPTestFramework
 from test_framework.util import (
     assert_equal,
     assert_raises_rpc_error
 )
 
 
-class CreateWalletWatchonlyTest(BitcoinTestFramework):
+class CreateWalletWatchonlyTest(XEPTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = False
         self.num_nodes = 1
@@ -36,10 +36,10 @@ class CreateWalletWatchonlyTest(BitcoinTestFramework):
         wo_wallet.importpubkey(pubkey=def_wallet.getaddressinfo(wo_addr)['pubkey'])
         wo_wallet.importpubkey(pubkey=def_wallet.getaddressinfo(wo_change)['pubkey'])
 
-        # generate some btc for testing
+        # generate some xep for testing
         node.generatetoaddress(101, a1)
 
-        # send 1 btc to our watch-only address
+        # send 1 xep to our watch-only address
         txid = def_wallet.sendtoaddress(wo_addr, 1)
         self.nodes[0].generate(1)
 

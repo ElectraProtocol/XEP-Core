@@ -4,7 +4,7 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test various net timeouts.
 
-- Create three bitcoind nodes:
+- Create three xepd nodes:
 
     no_verack_node - we never send a verack in response to their version
     no_version_node - we never send a version (only a ping)
@@ -25,7 +25,7 @@ from time import sleep
 
 from test_framework.messages import msg_ping
 from test_framework.p2p import P2PInterface
-from test_framework.test_framework import BitcoinTestFramework
+from test_framework.test_framework import XEPTestFramework
 
 
 class TestP2PConn(P2PInterface):
@@ -34,7 +34,7 @@ class TestP2PConn(P2PInterface):
         pass
 
 
-class TimeoutsTest(BitcoinTestFramework):
+class TimeoutsTest(XEPTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 1

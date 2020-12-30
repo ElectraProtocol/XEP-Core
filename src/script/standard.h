@@ -96,7 +96,7 @@ public:
 
 /**
  * Default setting for nMaxDatacarrierBytes. 640 bytes of data, +1 for OP_RETURN,
- * +3 for the pushdata opcodes. This is set at 8x the 80 byte limit of bitcoin in
+ * +3 for the pushdata opcodes. This is set at 8x the 80 byte limit of xep in
  * order to hold more data than and discourage bogus data carrying multisig outputs.
  */
 static const unsigned int MAX_OP_RETURN_RELAY = 644;
@@ -223,7 +223,7 @@ struct WitnessUnknown
  *  * WitnessV0KeyHash: TxoutType::WITNESS_V0_KEYHASH destination (P2WPKH)
  *  * WitnessUnknown: TxoutType::WITNESS_UNKNOWN/WITNESS_V1_TAPROOT destination (P2W???)
  *    (taproot outputs do not require their own type as long as no wallet support exists)
- *  A CTxDestination is the internal data type encoded in a bitcoin address
+ *  A CTxDestination is the internal data type encoded in a xep address
  */
 typedef boost::variant<CNoDestination, PKHash, ScriptHash, WitnessV0ScriptHash, WitnessV0KeyHash, WitnessUnknown> CTxDestination;
 
@@ -267,7 +267,7 @@ bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
 bool ExtractDestinations(const CScript& scriptPubKey, TxoutType& typeRet, std::vector<CTxDestination>& addressRet, int& nRequiredRet);
 
 /**
- * Generate a Bitcoin scriptPubKey for the given CTxDestination. Returns a P2PKH
+ * Generate a XEP scriptPubKey for the given CTxDestination. Returns a P2PKH
  * script for a CKeyID destination, a P2SH script for a CScriptID, and an empty
  * script for CNoDestination.
  */

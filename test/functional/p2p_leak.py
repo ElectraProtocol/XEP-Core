@@ -18,7 +18,7 @@ from test_framework.messages import (
     msg_version,
 )
 from test_framework.p2p import P2PInterface
-from test_framework.test_framework import BitcoinTestFramework
+from test_framework.test_framework import XEPTestFramework
 from test_framework.util import (
     assert_equal,
     assert_greater_than_or_equal,
@@ -88,7 +88,7 @@ class P2PVersionStore(P2PInterface):
         self.version_received = msg
 
 
-class P2PLeakTest(BitcoinTestFramework):
+class P2PLeakTest(XEPTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
 

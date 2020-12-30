@@ -4,10 +4,10 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test deprecation of getpeerinfo RPC fields."""
 
-from test_framework.test_framework import BitcoinTestFramework
+from test_framework.test_framework import XEPTestFramework
 
 
-class GetpeerinfoDeprecationTest(BitcoinTestFramework):
+class GetpeerinfoDeprecationTest(XEPTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.extra_args = [[], ["-deprecatedrpc=banscore"]]

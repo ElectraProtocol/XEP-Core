@@ -21,7 +21,7 @@ namespace Ui {
 }
 
 /**
- * A single entry in the dialog for sending bitcoins.
+ * A single entry in the dialog for sending xeps.
  * Stacked widget, with different UIs for payment requests
  * with a strong payee identity.
  */

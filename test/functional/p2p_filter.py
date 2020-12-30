@@ -21,7 +21,7 @@ from test_framework.messages import (
 )
 from test_framework.p2p import P2PInterface, p2p_lock
 from test_framework.script import MAX_SCRIPT_ELEMENT_SIZE
-from test_framework.test_framework import BitcoinTestFramework
+from test_framework.test_framework import XEPTestFramework
 
 
 class P2PBloomFilter(P2PInterface):
@@ -79,7 +79,7 @@ class P2PBloomFilter(P2PInterface):
             self._merkleblock_received = value
 
 
-class FilterTest(BitcoinTestFramework):
+class FilterTest(XEPTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = False
         self.num_nodes = 1

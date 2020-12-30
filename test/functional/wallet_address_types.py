@@ -53,7 +53,7 @@ Test that the nodes generate the correct change address type:
 from decimal import Decimal
 import itertools
 
-from test_framework.test_framework import BitcoinTestFramework
+from test_framework.test_framework import XEPTestFramework
 from test_framework.descriptors import (
     descsum_create,
     descsum_check,
@@ -64,7 +64,7 @@ from test_framework.util import (
     assert_raises_rpc_error,
 )
 
-class AddressTypeTest(BitcoinTestFramework):
+class AddressTypeTest(XEPTestFramework):
     def set_test_params(self):
         self.num_nodes = 6
         self.extra_args = [

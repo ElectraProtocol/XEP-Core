@@ -1,6 +1,6 @@
-Bitcoin Core version 0.12.1 is now available from:
+XEP Core version 0.12.1 is now available from:
 
-  <https://bitcoin.org/bin/bitcoin-core-0.12.1/>
+  <https://xep.org/bin/xep-core-0.12.1/>
 
 This is a new minor version release, including the BIP9, BIP68 and BIP112
 softfork, various bugfixes and updated translations.
@@ -17,8 +17,8 @@ How to Upgrade
 
 If you are running an older version, shut it down. Wait until it has completely
 shut down (which might take a few minutes for older versions), then run the
-installer (on Windows) or just copy over /Applications/Bitcoin-Qt (on Mac) or
-bitcoind/bitcoin-qt (on Linux).
+installer (on Windows) or just copy over /Applications/XEP-Qt (on Mac) or
+xepd/xep-qt (on Linux).
 
 Downgrade warning
 -----------------
@@ -27,10 +27,10 @@ Downgrade warning
 
 Because release 0.12.0 and later will obfuscate the chainstate on every
 fresh sync or reindex, the chainstate is not backwards-compatible with
-pre-0.12 versions of Bitcoin Core or other software.
+pre-0.12 versions of XEP Core or other software.
 
 If you want to downgrade after you have done a reindex with 0.12.0 or later,
-you will need to reindex when you first start Bitcoin Core version 0.11 or
+you will need to reindex when you first start XEP Core version 0.11 or
 earlier.
 
 Notable changes
@@ -74,7 +74,7 @@ BIP112 soft fork to enforce OP_CHECKSEQUENCEVERIFY
 --------------------------------------------------
 
 [BIP112][] redefines the existing OP_NOP3 as OP_CHECKSEQUENCEVERIFY (CSV)
-for a new opcode in the Bitcoin scripting system that in combination with
+for a new opcode in the XEP scripting system that in combination with
 [BIP68][] allows execution pathways of a script to be restricted based
 on the age of the output being spent.
 
@@ -84,11 +84,11 @@ For more information about the implementation, see
 BIP113 locktime enforcement soft fork
 -------------------------------------
 
-Bitcoin Core 0.11.2 previously introduced mempool-only locktime
+XEP Core 0.11.2 previously introduced mempool-only locktime
 enforcement using GetMedianTimePast(). This release seeks to
 consensus enforce the rule.
 
-Bitcoin transactions currently may specify a locktime indicating when
+XEP transactions currently may specify a locktime indicating when
 they may be added to a valid block.  Current consensus rules require
 that blocks have a block header time greater than the locktime specified
 in any transaction in that block.
@@ -152,7 +152,7 @@ git merge commit are mentioned.
 - #7739 `7ffc2bd` Add abandoned status to listtransactions (jonasschnelli)
 
 ### Block and transaction handling
-- #7543 `834aaef` Backport BIP9, BIP68 and BIP112 with softfork (btcdrak)
+- #7543 `834aaef` Backport BIP9, BIP68 and BIP112 with softfork (xepdrak)
 
 ### P2P protocol and network code
 - #7804 `90f1d24` Track block download times per individual block (sipa)
@@ -174,8 +174,8 @@ git merge commit are mentioned.
 ### Miscellaneous
 - #7617 `f04f4fd` Fix markdown syntax and line terminate LogPrint (MarcoFalke)
 - #7747 `4d035bc` added depends cross compile info (accraze)
-- #7741 `a0cea89` Mark p2p alert system as deprecated (btcdrak)
-- #7780 `c5f94f6` Disable bad-chain alert (btcdrak)
+- #7741 `a0cea89` Mark p2p alert system as deprecated (xepdrak)
+- #7780 `c5f94f6` Disable bad-chain alert (xepdrak)
 
 Credits
 =======
@@ -194,5 +194,5 @@ Thanks to everyone who directly contributed to this release:
 - Suhas Daftuar
 - Wladimir J. van der Laan
 
-As well as everyone that helped translating on [Transifex](https://www.transifex.com/projects/p/bitcoin/).
+As well as everyone that helped translating on [Transifex](https://www.transifex.com/projects/p/xep/).
 

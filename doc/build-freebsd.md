@@ -2,7 +2,7 @@ FreeBSD build guide
 ======================
 (updated for FreeBSD 12.0)
 
-This guide describes how to build bitcoind and command-line utilities on FreeBSD.
+This guide describes how to build xepd and command-line utilities on FreeBSD.
 
 This guide does not contain instructions for building the GUI.
 
@@ -34,7 +34,7 @@ BerkeleyDB is only necessary for the wallet functionality. To skip this, pass
 export BDB_PREFIX="$PWD/db4"
 ```
 
-## Building Bitcoin Core
+## Building XEP Core
 
 **Important**: Use `gmake` (the non-GNU `make` will exit with an error).
 

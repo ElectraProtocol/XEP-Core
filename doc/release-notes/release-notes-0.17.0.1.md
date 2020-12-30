@@ -1,6 +1,6 @@
-Bitcoin Core version 0.17.0.1 is now available from:
+XEP Core version 0.17.0.1 is now available from:
 
-  <https://bitcoincore.org/bin/bitcoin-core-0.17.0.1/>
+  <https://bitcoincore.org/bin/xep-core-0.17.0.1/>
 
 This release provides a minor bug fix for 0.17.0.
 

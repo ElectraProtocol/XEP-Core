@@ -33,7 +33,7 @@ from test_framework.messages import (
     msg_block,
 )
 from test_framework.p2p import P2PInterface
-from test_framework.test_framework import BitcoinTestFramework
+from test_framework.test_framework import XEPTestFramework
 from test_framework.util import (
     assert_equal,
     assert_greater_than,
@@ -45,7 +45,7 @@ from test_framework.util import (
 )
 
 
-class BlockchainTest(BitcoinTestFramework):
+class BlockchainTest(XEPTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 1
