@@ -164,7 +164,7 @@
         <translation>वॉलेट एन्क्रिप्शन की पुष्टि करें</translation>
     </message>
     <message>
-        <source>Warning: If you encrypt your wallet and lose your passphrase, you will &lt;b&gt;LOSE ALL OF YOUR BITCOINS&lt;/b&gt;!</source>
+        <source>Warning: If you encrypt your wallet and lose your passphrase, you will &lt;b&gt;LOSE ALL OF YOUR XEPS&lt;/b&gt;!</source>
         <translation>चेतावनी: यदि आपने वॉलेट को एन्क्रिप्ट करने के बाद पदबंध खो दी तो &lt;b&gt;आप सारे बिटकॉइन खो देंगे &lt;/b&gt;!</translation>
     </message>
     <message>
