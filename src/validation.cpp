@@ -5735,13 +5735,12 @@ bool CheckBlockSignature(const CBlock& block)
     CPubKey pubkey;
 
     if (whichType == TxoutType::PUBKEY) {
-        const std::vector<unsigned char>& vchPubKey = vSolutions[0];
-        pubkey = CPubKey(vchPubKey);
+        pubkey = CPubKey(vSolutions[0]);
     } else {
         if (block.IsProofOfWork()) // no inputs for coinbase
             return false;
         const CTxIn& txin = block.vtx[1]->vin[0];
-        if (txin.scriptSig.size() == 0 && txin.scriptWitness.stack.size() == 2 && txin.scriptWitness.stack.back().size() == CPubKey::COMPRESSED_SIZE) { // p2wpkh input
+        if ((txin.scriptSig.size() == 0 || txin.scriptSig.size() == 23) && txin.scriptWitness.stack.size() == 2 && txin.scriptWitness.stack.back().size() == CPubKey::COMPRESSED_SIZE) { // p2wpkh or p2sh-p2wpkh input
             pubkey = CPubKey(txin.scriptWitness.stack.back());
         } else if (txin.scriptWitness.stack.size() == 0 && txin.scriptSig.size() >= 70 && txin.scriptSig.size() <= 140 && txin.scriptSig.IsPushOnly() && txin.scriptSig[0] >= 70 && txin.scriptSig[0] <= 73) { // p2pkh input (sig + pubkey)
             unsigned int pubkeyStart = txin.scriptSig[0] + 2u; // skip sig and length bytes by reading sig length from pushdata

@@ -590,33 +590,71 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                 if (gArgs.GetBoolArg("-debug", false) && gArgs.GetBoolArg("-printcoinstake", false))
                     LogPrintf("%s : parsed kernel type=%s\n", __func__, GetTxnOutputType(whichType));
 
-                if (whichType != TxoutType::PUBKEY && gArgs.GetBoolArg("-quantumsafestaking", false)) {
-                    OutputType output_type = OutputType::BECH32;
-                    CTxDestination dest;
-                    std::string error;
-                    if (pwallet->GetNewChangeDestination(output_type, dest, error)) {
-                        LogPrintf("%s : using new destination for coinstake (%s)\n", __func__, EncodeDestination(dest));
-                        scriptPubKeyOut = GetScriptForDestination(dest);
-                    } else {
-                        LogPrintf("%s : failed to get new destination for coinstake (%s)\n", __func__, error);
+                if (whichType == TxoutType::PUBKEYHASH || whichType == TxoutType::WITNESS_V0_KEYHASH || whichType == TxoutType::SCRIPTHASH) { // we support p2pkh, p2wpkh, and p2sh-p2wpkh inputs
+                    if (whichType == TxoutType::SCRIPTHASH) { // a p2sh input could be many things, but we only support p2sh-p2wpkh for now
+                        CScript subscript;
+                        std::unique_ptr<SigningProvider> provider = pwallet->GetSolvingProvider(scriptPubKeyKernel);
+                        if (provider && provider->GetCScript(CScriptID(uint160(vSolutions[0])), subscript)) { // extract the redeem script
+                            TxoutType scriptType = Solver(subscript, vSolutions);
+                            if (scriptType != TxoutType::WITNESS_V0_KEYHASH || Params().NetworkIDString() == CBaseChainParams::MAIN) { // this is a script we don't recognize
+                                if (gArgs.GetBoolArg("-debug", false) && gArgs.GetBoolArg("-printcoinstake", false))
+                                    LogPrintf("%s : no support for %s kernel type=%s\n", __func__, GetTxnOutputType(whichType), GetTxnOutputType(scriptType));
+                                continue;
+                            }
+                            whichType = scriptType;
+                        } else {
+                            if (gArgs.GetBoolArg("-debug", false) && gArgs.GetBoolArg("-printcoinstake", false))
+                                LogPrintf("%s : failed to get script for kernel type=%s\n", __func__, GetTxnOutputType(whichType));
+                            continue; // unable to find corresponding script
+                        }
+                    }
+
+                    if (gArgs.GetBoolArg("-quantumsafestaking", false)) { // a new bech32 address is generated for every stake to protect the public key from quantum computers
+                        OutputType output_type = OutputType::BECH32;
+                        CTxDestination dest;
+                        std::string error;
+                        if (pwallet->GetNewChangeDestination(output_type, dest, error)) {
+                            LogPrintf("%s : using new destination for coinstake (%s)\n", __func__, EncodeDestination(dest));
+                            scriptPubKeyOut = GetScriptForDestination(dest);
+                        } else {
+                            LogPrintf("%s : failed to get new destination for coinstake (%s)\n", __func__, error);
+                            scriptPubKeyOut = scriptPubKeyKernel;
+                        }
+                    } else if (!pwallet->IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS)) { // on legacy wallets we can convert every input to p2pk for smaller coinstake TXs
+                        // convert to pay to public key type
+                        CPubKey pubkey;
+                        std::unique_ptr<SigningProvider> provider = pwallet->GetSolvingProvider(scriptPubKeyKernel);
+                        if (!provider || !provider->GetPubKey(CKeyID(uint160(vSolutions[0])), pubkey)) {
+                            if (gArgs.GetBoolArg("-debug", false) && gArgs.GetBoolArg("-printcoinstake", false))
+                                LogPrintf("%s : failed to get key for kernel type=%s\n", __func__, GetTxnOutputType(whichType));
+                            continue; // unable to find corresponding public key
+                        }
+                        scriptPubKeyOut << ToByteVector(pubkey) << OP_CHECKSIG;
+                    } else { // descriptor wallets only credit earnings back to the original address
                         scriptPubKeyOut = scriptPubKeyKernel;
                     }
-                } else if ((whichType == TxoutType::PUBKEYHASH || whichType == TxoutType::WITNESS_V0_KEYHASH) && !pwallet->IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS)) { // pay to address type or witness keyhash
+                } else if (whichType == TxoutType::PUBKEY) { // p2pk inputs can be left alone
+                    scriptPubKeyOut = scriptPubKeyKernel;
+                } else if (!pwallet->IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS) && (whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_DATA)) { // convert multisig to p2pk
                     // convert to pay to public key type
                     CPubKey pubkey;
-                    std::unique_ptr<SigningProvider> provider = pwallet->GetSolvingProvider(scriptPubKeyKernel);
-                    if (!provider || !provider->GetPubKey(CKeyID(uint160(vSolutions[0])), pubkey)) {
+                    bool found = false;
+                    if (vSolutions.size() == 3 && vSolutions.front()[0] == 1 && vSolutions.back()[0] == 1) { // only support single pubkey multisig for now
+                        pubkey = CPubKey(vSolutions[1]);
+                        if (pubkey.IsValid())
+                            found = true;
+                    }
+                    if (found) {
+                        scriptPubKeyOut << ToByteVector(pubkey) << OP_CHECKSIG;
+                    } else {
                         if (gArgs.GetBoolArg("-debug", false) && gArgs.GetBoolArg("-printcoinstake", false))
                             LogPrintf("%s : failed to get key for kernel type=%s\n", __func__, GetTxnOutputType(whichType));
-                        continue;  // unable to find corresponding public key
+                        continue; // unable to find corresponding public key
                     }
-                    scriptPubKeyOut << ToByteVector(pubkey) << OP_CHECKSIG;
-                } else if (whichType == TxoutType::PUBKEY || (pwallet->IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS) && (whichType == TxoutType::PUBKEYHASH || whichType == TxoutType::WITNESS_V0_KEYHASH))) {
-                    scriptPubKeyOut = scriptPubKeyKernel;
                 } else {
                     if (gArgs.GetBoolArg("-debug", false) && gArgs.GetBoolArg("-printcoinstake", false))
                         LogPrintf("%s : no support for kernel type=%s\n", __func__, GetTxnOutputType(whichType));
-                    continue;  // only support pay to public key and pay to address and pay to witness keyhash
+                    continue; // only support p2pk, p2pkh, p2wpkh, and p2sh-p2wpkh
                 }
 
                 coinstakeTx.vin.push_back(CTxIn(prevout.hash, prevout.n));
