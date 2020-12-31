@@ -4646,13 +4646,27 @@ bool CWallet::SignBlock(CBlock& block) const
     TxoutType whichType = Solver(scriptPubKey, vSolutions);
 
     // Sign
-    const std::vector<unsigned char>& vchPubKey = vSolutions[0];
     CPubKey pubkey;
     if (whichType == TxoutType::PUBKEY) {
-        pubkey = CPubKey(vchPubKey);
+        pubkey = CPubKey(vSolutions[0]);
     } else if (whichType == TxoutType::PUBKEYHASH || whichType == TxoutType::WITNESS_V0_KEYHASH) {
         std::unique_ptr<SigningProvider> provider = GetSolvingProvider(scriptPubKey);
-        if (!provider || !provider->GetPubKey(CKeyID(uint160(vchPubKey)), pubkey))
+        if (!provider || !provider->GetPubKey(CKeyID(uint160(vSolutions[0])), pubkey))
+            return false;
+    } else if (whichType == TxoutType::SCRIPTHASH) {
+        CScript subscript;
+        std::unique_ptr<SigningProvider> provider = GetSolvingProvider(scriptPubKey);
+        if (provider && provider->GetCScript(CScriptID(uint160(vSolutions[0])), subscript)) {
+            whichType = Solver(subscript, vSolutions);
+            if (whichType != TxoutType::WITNESS_V0_KEYHASH || !provider->GetPubKey(CKeyID(uint160(vSolutions[0])), pubkey))
+                return false;
+        } else
+            return false;
+    } else if (whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_DATA) {
+        if (vSolutions.size() != 3 || vSolutions.front()[0] != 1 || vSolutions.back()[0] != 1)
+            return false;
+        pubkey = CPubKey(vSolutions[1]);
+        if (!pubkey.IsValid())
             return false;
     } else {
         return false;

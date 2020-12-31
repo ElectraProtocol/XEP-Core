@@ -124,9 +124,9 @@
         <translation>Qinisekisa ukubethelwa kwe-wallet</translation>
     </message>
     <message>
-        <source>Warning: If you encrypt your wallet and lose your passphrase, you will &lt;b&gt;LOSE ALL OF YOUR BITCOINS&lt;/b&gt;!</source>
+        <source>Warning: If you encrypt your wallet and lose your passphrase, you will &lt;b&gt;LOSE ALL OF YOUR XEPS&lt;/b&gt;!</source>
         <translation>Isexwayiso: Uma ubhala ngemfihlo isikhwama sakho futhi ulahlekelwe umushwana wakho wokungena, uzokwazi
-Lahla YONKE IBITCOIN YAKHO!</translation>
+Lahla YONKE IXEP YAKHO!</translation>
     </message>
     <message>
         <source>Are you sure you wish to encrypt your wallet?</source>

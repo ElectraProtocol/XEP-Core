@@ -130,7 +130,8 @@ static bool GenerateBlock(ChainstateManager& chainman, CBlock& block, uint64_t& 
     if (block.nNonce == std::numeric_limits<uint32_t>::max()) {
         return true;
     }
-    LogPrintf("proof-of-work found\n   hash: %s\n target: %s\n   bits: %08x\n  nonce: %u\n", block.GetPoWHash().ToString(), arith_uint256().SetCompact(block.nBits).ToString(), block.nBits, block.nNonce);
+    if (chainparams.NetworkIDString() != CBaseChainParams::REGTEST)
+        LogPrintf("proof-of-work found\n   hash: %s\n target: %s\n   bits: %08x\n  nonce: %u\n", block.GetPoWHash().ToString(), arith_uint256().SetCompact(block.nBits).ToString(), block.nBits, block.nNonce);
 
     std::shared_ptr<const CBlock> shared_pblock = std::make_shared<const CBlock>(block);
     if (!chainman.ProcessNewBlock(chainparams, shared_pblock, true, nullptr)) {
