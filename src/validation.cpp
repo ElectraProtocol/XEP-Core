@@ -1252,6 +1252,8 @@ CAmount GetBlockSubsidy(int nHeight, bool fProofOfStake, uint64_t nCoinAge, cons
     } else {
         if (nHeight == 0) // premine
             nSubsidy = 30000000000 * COIN; // 30 billion
+        else if (Params().NetworkIDString() != CBaseChainParams::MAIN)
+            nSubsidy = 1000 * COIN;
         else
             nSubsidy = 1 * COIN;
     }
