@@ -333,6 +333,7 @@ public:
             vSeeds.emplace_back("seed06.electraprotocol.network");
             vSeeds.emplace_back("seed07.electraprotocol.network");
             vSeeds.emplace_back("seed08.electraprotocol.network");
+            //vSeeds.emplace_back("v7ajjeirttkbnt32wpy3c6w3emwnfr3fkla7hpxcfokr3ysd3kqtzmqd.onion:38333");
 
             consensus.nMinimumChainWork = uint256S("0x0000000000000000000000000000000000000000000000000000000000000000");
             consensus.defaultAssumeValid = uint256S("0x0000000000000000000000000000000000000000000000000000000000000000"); // 9434
