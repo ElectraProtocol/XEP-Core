@@ -1884,8 +1884,12 @@ void CWallet::ReacceptWalletTransactions()
 
         int nDepth = wtx.GetDepthInMainChain();
 
-        if (!wtx.IsCoinBase() && !wtx.IsCoinStake() && (nDepth == 0 && !wtx.isAbandoned())) {
-            mapSorted.insert(std::make_pair(wtx.nOrderPos, &wtx));
+        if (nDepth == 0 && !wtx.isAbandoned()) {
+            if (wtx.IsCoinBase() || wtx.IsCoinStake()) {
+                WalletLogPrintf("Abandoning orphaned coinbase/coinstake %s\n", wtxid.ToString());
+                AbandonTransaction(wtxid);
+            } else
+                mapSorted.insert(std::make_pair(wtx.nOrderPos, &wtx));
         }
     }
 
