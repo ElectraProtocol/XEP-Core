@@ -511,20 +511,25 @@ void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpda
     }
 }
 
-void IncrementExtraNonce(CBlock* pblock, const CBlockIndex* pindexPrev, unsigned int& nExtraNonce)
+void IncrementExtraNonce(CBlock* pblock, const CBlockIndex* pindexPrev, unsigned int& nExtraNonce, const CPubKey* signingPubKey)
 {
     // Update nExtraNonce
-    static uint256 hashPrevBlock;
-    if (hashPrevBlock != pblock->hashPrevBlock)
-    {
-        if (!pblock->IsProofOfStake())
+    if (!pblock->IsProofOfStake()) {
+        static uint256 hashPrevBlock;
+        if (hashPrevBlock != pblock->hashPrevBlock)
+        {
             nExtraNonce = 0;
-        hashPrevBlock = pblock->hashPrevBlock;
+            hashPrevBlock = pblock->hashPrevBlock;
+        }
     }
     ++nExtraNonce;
     unsigned int nHeight = pindexPrev->nHeight+1; // Height first in coinbase required for block.version=2
     CMutableTransaction txCoinbase(*pblock->vtx[0]);
     txCoinbase.vin[0].scriptSig = (CScript() << nHeight << CScriptNum(nExtraNonce));
+    if (signingPubKey) {
+        txCoinbase.vin[0].scriptSig << ToByteVector(*signingPubKey);
+        //txCoinbase.vout.push_back(CTxOut(0, CScript() << OP_RETURN << ToByteVector(*signingPubKey)));
+    }
     assert(txCoinbase.vin[0].scriptSig.size() <= 100);
 
     pblock->vtx[0] = MakeTransactionRef(std::move(txCoinbase));
@@ -591,13 +596,20 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                 if (gArgs.GetBoolArg("-debug", false) && gArgs.GetBoolArg("-printcoinstake", false))
                     LogPrintf("%s : parsed kernel type=%s\n", __func__, GetTxnOutputType(whichType));
 
-                if (whichType == TxoutType::PUBKEYHASH || whichType == TxoutType::WITNESS_V0_KEYHASH || whichType == TxoutType::SCRIPTHASH) { // we support p2pkh, p2wpkh, and p2sh-p2wpkh inputs
-                    if (whichType == TxoutType::SCRIPTHASH) { // a p2sh input could be many things, but we only support p2sh-p2wpkh for now
+                if (whichType == TxoutType::PUBKEY || whichType == TxoutType::PUBKEYHASH || whichType == TxoutType::WITNESS_V0_KEYHASH || whichType == TxoutType::SCRIPTHASH || whichType == TxoutType::WITNESS_V0_SCRIPTHASH) { // we support p2pkh, p2wpkh, p2sh-p2wpkh, and p2sh/p2wsh-multisig inputs
+                    const bool fNewStakingCodeActive = Params().NetworkIDString() != CBaseChainParams::MAIN;
+                    if (whichType == TxoutType::SCRIPTHASH || whichType == TxoutType::WITNESS_V0_SCRIPTHASH) { // a p2sh/p2wsh input could be many things, but we only support p2sh-p2wpkh and multisig for now
                         CScript subscript;
                         std::unique_ptr<SigningProvider> provider = pwallet->GetSolvingProvider(scriptPubKeyKernel);
-                        if (provider && provider->GetCScript(CScriptID(uint160(vSolutions[0])), subscript)) { // extract the redeem script
+                        uint160 hash;
+                        if (whichType == TxoutType::WITNESS_V0_SCRIPTHASH) {
+                            CRIPEMD160 hasher;
+                            hasher.Write(&vSolutions[0][0], 32).Finalize(hash.begin());
+                        } else // whichType == TxoutType::SCRIPTHASH
+                            hash = uint160(vSolutions[0]);
+                        if (provider && provider->GetCScript(CScriptID(hash), subscript)) { // extract the redeem script
                             TxoutType scriptType = Solver(subscript, vSolutions);
-                            if (scriptType != TxoutType::WITNESS_V0_KEYHASH || Params().NetworkIDString() == CBaseChainParams::MAIN) { // this is a script we don't recognize
+                            if (!fNewStakingCodeActive || (scriptType != TxoutType::WITNESS_V0_KEYHASH && scriptType != TxoutType::MULTISIG && scriptType != TxoutType::MULTISIG_DATA)) { // this is a script we don't recognize
                                 if (gArgs.GetBoolArg("-debug", false) && gArgs.GetBoolArg("-printcoinstake", false))
                                     LogPrintf("%s : no support for %s kernel type=%s\n", __func__, GetTxnOutputType(whichType), GetTxnOutputType(scriptType));
                                 continue;
@@ -610,7 +622,7 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                         }
                     }
 
-                    if (gArgs.GetBoolArg("-quantumsafestaking", false)) { // a new bech32 address is generated for every stake to protect the public key from quantum computers
+                    if ((fNewStakingCodeActive || whichType != TxoutType::PUBKEY) && gArgs.GetBoolArg("-quantumsafestaking", false)) { // a new bech32 address is generated for every stake to protect the public key from quantum computers
                         OutputType output_type = OutputType::BECH32;
                         CTxDestination dest;
                         std::string error;
@@ -621,7 +633,18 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                             LogPrintf("%s : failed to get new destination for coinstake (%s)\n", __func__, error);
                             scriptPubKeyOut = scriptPubKeyKernel;
                         }
-                    } else if (!pwallet->IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS)) { // on legacy wallets we can convert every input to p2pk for smaller coinstake TXs
+                    } else if (whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_DATA) { // try to create a new destination for p2sh/p2wsh-multisig inputs
+                        OutputType output_type = OutputType::BECH32;
+                        CTxDestination dest;
+                        std::string error;
+                        if (pwallet->GetNewChangeDestination(output_type, dest, error)) {
+                            LogPrintf("%s : using new destination for coinstake (%s)\n", __func__, EncodeDestination(dest));
+                            scriptPubKeyOut = GetScriptForDestination(dest);
+                        } else
+                            continue;
+                    } else if (pwallet->IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS) || whichType == TxoutType::PUBKEY) { // descriptor wallets only credit earnings back to the original address and p2pk inputs can be left alone
+                        scriptPubKeyOut = scriptPubKeyKernel;
+                    } else { // on legacy wallets we can convert every input to p2pk for smaller coinstake TXs
                         // convert to pay to public key type
                         CPubKey pubkey;
                         std::unique_ptr<SigningProvider> provider = pwallet->GetSolvingProvider(scriptPubKeyKernel);
@@ -631,11 +654,7 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                             continue; // unable to find corresponding public key
                         }
                         scriptPubKeyOut << ToByteVector(pubkey) << OP_CHECKSIG;
-                    } else { // descriptor wallets only credit earnings back to the original address
-                        scriptPubKeyOut = scriptPubKeyKernel;
                     }
-                } else if (whichType == TxoutType::PUBKEY) { // p2pk inputs can be left alone
-                    scriptPubKeyOut = scriptPubKeyKernel;
                 } else if (!pwallet->IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS) && (whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_DATA)) { // convert multisig to p2pk
                     // convert to pay to public key type
                     CPubKey pubkey;
@@ -655,7 +674,7 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                 } else {
                     if (gArgs.GetBoolArg("-debug", false) && gArgs.GetBoolArg("-printcoinstake", false))
                         LogPrintf("%s : no support for kernel type=%s\n", __func__, GetTxnOutputType(whichType));
-                    continue; // only support p2pk, p2pkh, p2wpkh, and p2sh-p2wpkh
+                    continue; // only support p2pk, p2pkh, p2wpkh, p2sh-p2wpkh, and p2sh/p2wsh-multisig
                 }
 
                 coinstakeTx.vin.push_back(CTxIn(prevout.hash, prevout.n));
@@ -693,8 +712,9 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
 
 static inline bool ProcessBlockFound(const CBlock* pblock, const CChainParams& chainparams, ChainstateManager* chainman)
 {
-    LogPrintf("%s\n", pblock->ToString());
-    LogPrintf("generated %s\n", FormatMoney(pblock->IsProofOfStake() ? pblock->vtx[1]->GetValueOut() : pblock->vtx[0]->GetValueOut()));
+    if (chainparams.NetworkIDString() != CBaseChainParams::REGTEST)
+        LogPrintf("%s", pblock->ToString());
+    //LogPrintf("generated %s\n", FormatMoney(pblock->IsProofOfStake() ? pblock->vtx[1]->GetValueOut() : pblock->vtx[0]->GetValueOut()));
 
     // Found a solution
     {
@@ -813,12 +833,21 @@ static inline void PoSMiner(std::shared_ptr<CWallet> pwallet, ChainstateManager*
                 return;
             }
             pblock = &pblocktemplate->block;
-            IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
+            CPubKey signingPubKey;
+            bool pubkeyInSig = true;
+            {
+                LOCK(pwallet->cs_wallet);
+                if (!pwallet->GetBlockSigningPubKey(*pblock, signingPubKey, pubkeyInSig)) {
+                    LogPrintf("PoSMiner(): failed to get signing pubkey for PoS block\n");
+                    continue;
+                }
+            }
+            IncrementExtraNonce(pblock, pindexPrev, nExtraNonce, pubkeyInSig ? nullptr : &signingPubKey);
 
             // peercoin: if proof-of-stake block found then process block
             {
                 LOCK(pwallet->cs_wallet);
-                if (!pwallet->SignBlock(*pblock)) {
+                if (!pwallet->SignBlock(*pblock, signingPubKey)) {
                     LogPrintf("PoSMiner(): failed to sign PoS block\n");
                     continue;
                 }

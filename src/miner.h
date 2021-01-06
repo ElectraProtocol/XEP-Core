@@ -8,6 +8,7 @@
 
 #include <optional.h>
 #include <primitives/block.h>
+#include <pubkey.h>
 #include <txmempool.h>
 #include <validation.h>
 
@@ -210,7 +211,7 @@ private:
 };
 
 /** Modify the extranonce in a block */
-void IncrementExtraNonce(CBlock* pblock, const CBlockIndex* pindexPrev, unsigned int& nExtraNonce);
+void IncrementExtraNonce(CBlock* pblock, const CBlockIndex* pindexPrev, unsigned int& nExtraNonce, const CPubKey* signingPubKey = nullptr);
 int64_t UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, const CBlockIndex* pindexPrev);
 
 /** Update an old GenerateCoinbaseCommitment from CreateNewBlock after the block txs have changed */
