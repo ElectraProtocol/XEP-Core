@@ -222,6 +222,6 @@ namespace boost {
 } // namespace boost
 
 bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shared_ptr<CWallet> pwallet, const int& nHeight, const CBlockIndex* pindexPrev, const Consensus::Params& consensusParams);
-void MintStake(boost::thread_group& threadGroup, std::shared_ptr<CWallet> pwallet, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool);
+void MintStake(boost::thread_group& threadGroup, std::shared_ptr<CWallet> pwallet, const unsigned int walletNum, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool);
 
 #endif // BITCOIN_MINER_H

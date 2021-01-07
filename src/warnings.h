@@ -14,6 +14,8 @@ void SetMiscWarning(const bilingual_str& warning);
 void SetfLargeWorkForkFound(bool flag);
 bool GetfLargeWorkForkFound();
 void SetfLargeWorkInvalidChainFound(bool flag);
+void SetMintWarning(const std::string& warning);
+std::string GetMintWarning();
 /** Format a string that describes several potential problems detected by the core.
  * @param[in] verbose bool
  * - if true, get all warnings separated by <hr />
@@ -22,5 +24,4 @@ void SetfLargeWorkInvalidChainFound(bool flag);
  */
 bilingual_str GetWarnings(bool verbose);
 
-extern std::string strMintWarning;
 #endif //  BITCOIN_WARNINGS_H

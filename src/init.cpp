@@ -2031,8 +2031,10 @@ bool AppInitMain(const util::Ref& context, NodeContext& node, interfaces::BlockA
     }, DUMP_BANS_INTERVAL);
 
     std::vector<std::shared_ptr<CWallet>> wallets = GetWallets();
-    if (wallets.size() && wallets[0])
-        MintStake(threadGroup, wallets[0], node.chainman, node.connman.get(), node.mempool.get());
+    for (unsigned int i = 0; i < wallets.size(); i++) {
+        if (wallets[i])
+            MintStake(threadGroup, wallets[i], i+1, node.chainman, node.connman.get(), node.mempool.get());
+    }
 
 #if HAVE_SYSTEM
     StartupNotify(args);

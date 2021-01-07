@@ -16,7 +16,7 @@ static Mutex g_warnings_mutex;
 static bilingual_str g_misc_warnings GUARDED_BY(g_warnings_mutex);
 static bool fLargeWorkForkFound GUARDED_BY(g_warnings_mutex) = false;
 static bool fLargeWorkInvalidChainFound GUARDED_BY(g_warnings_mutex) = false;
-std::string strMintWarning;
+static std::string strMintWarning GUARDED_BY(g_warnings_mutex);
 
 void SetMiscWarning(const bilingual_str& warning)
 {
@@ -40,6 +40,18 @@ void SetfLargeWorkInvalidChainFound(bool flag)
 {
     LOCK(g_warnings_mutex);
     fLargeWorkInvalidChainFound = flag;
+}
+
+void SetMintWarning(const std::string& warning)
+{
+    LOCK(g_warnings_mutex);
+    strMintWarning = warning;
+}
+
+std::string GetMintWarning()
+{
+    LOCK(g_warnings_mutex);
+    return strMintWarning;
 }
 
 bilingual_str GetWarnings(bool verbose)
