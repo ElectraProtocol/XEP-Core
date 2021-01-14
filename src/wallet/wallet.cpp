@@ -4693,6 +4693,15 @@ bool CWallet::GetBlockSigningPubKey(const CBlock& block, CPubKey& pubkey, bool& 
                 std::unique_ptr<SigningProvider> provider = GetSolvingProvider(txout.scriptPubKey);
                 if (!provider || !provider->GetPubKey(CKeyID(uint160(vSolutions[0])), pubkey)) // extract pubkey from output to put in coinbase
                     return false;
+            } else if (outputType == TxoutType::SCRIPTHASH) {
+                CScript subscript;
+                std::unique_ptr<SigningProvider> provider = GetSolvingProvider(txout.scriptPubKey);
+                if (provider && provider->GetCScript(CScriptID(uint160(vSolutions[0])), subscript)) { // extract pubkey from script to put in coinbase
+                    outputType = Solver(subscript, vSolutions);
+                    if (outputType != TxoutType::WITNESS_V0_KEYHASH || !provider->GetPubKey(CKeyID(uint160(vSolutions[0])), pubkey))
+                        return false;
+                } else
+                    return false;
             } else
                 return false;
         } else

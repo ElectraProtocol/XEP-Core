@@ -746,11 +746,12 @@ static inline void PoSMiner(std::shared_ptr<CWallet> pwallet, ChainstateManager*
         LogPrintf("Set proof-of-stake timeout: %ums for %u UTXOs\n", pos_timio, vCoins.size());
     }
 
-    const std::string strMintMessage = _("Info: Minting suspended due to locked wallet.").translated;
+    const std::string strMintWalletMessage = _("Info: Minting suspended due to locked wallet.").translated;
     const std::string strMintSyncMessage = _("Info: Minting suspended while synchronizing wallet.").translated;
     const std::string strMintDisabledMessage = _("Info: Minting disabled by 'nostaking' option.").translated;
     const std::string strMintBlockMessage = _("Info: Minting suspended due to block creation failure.").translated;
     const std::string strMintEmpty = "";
+
     if (!gArgs.GetBoolArg("-staking", true)) {
         SetMintWarning(strMintDisabledMessage);
         LogPrintf("proof-of-stake minter disabled\n");
@@ -761,8 +762,8 @@ static inline void PoSMiner(std::shared_ptr<CWallet> pwallet, ChainstateManager*
         bool fNeedToClear = false;
         while (true) {
             while (pwallet->IsLocked()) {
-                if (GetMintWarning() != strMintMessage) {
-                    SetMintWarning(strMintMessage);
+                if (GetMintWarning() != strMintWalletMessage) {
+                    SetMintWarning(strMintWalletMessage);
                     uiInterface.NotifyAlertChanged();
                 }
                 fNeedToClear = true;

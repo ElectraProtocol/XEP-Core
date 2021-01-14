@@ -5760,6 +5760,10 @@ bool CheckBlockSignature(const CBlock& block)
                 if (Hash160(pubkey) != uint160(vSolutions[0])) {
                     return error("%s : pubkey used for block signature (%s) does not correspond to first output", __func__, HexStr(pubkey));
                 }
+            } else if (whichType == TxoutType::SCRIPTHASH) {
+                if (Hash160(CScript() << OP_0 << ToByteVector(Hash160(pubkey))) != uint160(vSolutions[0])) { // p2sh-p2wpkh
+                    return error("%s : pubkey used for block signature (%s) is not used in first %s output", __func__, HexStr(pubkey), GetTxnOutputType(whichType));
+                }
             } else
                 return error("%s : unable to verify pubkey belongs to first output of type=%s", __func__, GetTxnOutputType(whichType));
         } else if ((fProofOfStake && block.vtx[1]->vout.size() > 2) || (!fProofOfStake && block.vtx[0]->vout.size() > 1)) { // check for pubkey in OP_RETURN output - this can be any arbitrary pubkey as it will be covered by the coinstake TX signature hash
