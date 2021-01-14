@@ -7,6 +7,8 @@
 
 #include <QDialog>
 #include <QWidget>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
 
 QT_BEGIN_NAMESPACE
 class QMainWindow;
@@ -31,6 +33,35 @@ public:
 private:
     Ui::HelpMessageDialog *ui;
     QString text;
+
+private Q_SLOTS:
+    void on_okButton_accepted();
+};
+
+/** "Update wallet" dialog box */
+class UpdateWalletDialog : public QDialog
+{
+    Q_OBJECT
+
+public:
+    explicit UpdateWalletDialog(QWidget *parent);
+    ~UpdateWalletDialog();
+
+    void checkForUpdate();
+
+private:
+    Ui::HelpMessageDialog *ui;
+    QNetworkAccessManager *manager = nullptr;
+    QNetworkReply *reply = nullptr;
+    bool mandatoryUpdate = false;
+    unsigned int newVersionMajor = 0;
+    unsigned int newVersionMinor = 0;
+    unsigned int newVersionRevision = 0;
+    unsigned int newVersionBuild = 0;
+    unsigned int newVersionRC = 0;
+
+    void gotReply();
+    QString getUpdateString();
 
 private Q_SLOTS:
     void on_okButton_accepted();

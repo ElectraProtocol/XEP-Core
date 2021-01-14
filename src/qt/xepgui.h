@@ -37,6 +37,7 @@ class WalletController;
 class WalletFrame;
 class WalletModel;
 class HelpMessageDialog;
+class UpdateWalletDialog;
 class ModalOverlay;
 enum class SynchronizationState;
 
@@ -173,6 +174,7 @@ private:
     Notificator* notificator = nullptr;
     RPCConsole* rpcConsole = nullptr;
     HelpMessageDialog* helpMessageDialog = nullptr;
+    UpdateWalletDialog* updateWalletDialog = nullptr;
     ModalOverlay* modalOverlay = nullptr;
 
 #ifdef Q_OS_MAC

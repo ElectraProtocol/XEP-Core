@@ -96,6 +96,7 @@ XEPGUI::XEPGUI(interfaces::Node& node, const PlatformStyle *_platformStyle, cons
 
     rpcConsole = new RPCConsole(node, _platformStyle, nullptr);
     helpMessageDialog = new HelpMessageDialog(this, false);
+    updateWalletDialog = new UpdateWalletDialog(this);
 #ifdef ENABLE_WALLET
     if(enableWallet)
     {
@@ -214,6 +215,8 @@ XEPGUI::XEPGUI(interfaces::Node& node, const PlatformStyle *_platformStyle, cons
 #ifdef Q_OS_MAC
     m_app_nap_inhibitor = new CAppNapInhibitor;
 #endif
+
+    updateWalletDialog->checkForUpdate();
 
     GUIUtil::handleCloseWindowShortcut(this);
 }
