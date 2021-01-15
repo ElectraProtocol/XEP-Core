@@ -10,9 +10,12 @@
 #include <chain.h>
 //#include <logging.h>
 #include <primitives/block.h>
+#include <sync.h>
 #include <uint256.h>
 
-#include <atomic>
+#include <mutex>
+
+RecursiveMutex cs_target_cache;
 
 // peercoin: find last block index up to pindex
 static inline const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, const bool fProofOfStake)
@@ -186,19 +189,6 @@ unsigned int WeightedTargetExponentialMovingAverage(const CBlockIndex* pindexLas
     return bnNew.GetCompactRounded();
 }
 
-static inline void Arith256ToAtomic(const arith_uint256& arith, std::atomic<uint64_t>& first, std::atomic<uint64_t>& second, std::atomic<uint64_t>& third, std::atomic<uint64_t>& fourth)
-{
-    first.store(arith.GetLow64());
-    second.store((arith >> 64).GetLow64());
-    third.store((arith >> 128).GetLow64());
-    fourth.store((arith >> 192).GetLow64());
-}
-
-static inline void AtomicToArith256(arith_uint256& arith, const std::atomic<uint64_t>& first, const std::atomic<uint64_t>& second, const std::atomic<uint64_t>& third, const std::atomic<uint64_t>& fourth)
-{
-    arith = arith_uint256(first.load()) | (arith_uint256(second.load()) << 64) | (arith_uint256(third.load()) << 128) | (arith_uint256(fourth.load()) << 192);
-}
-
 unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
 {
     const int algo = CBlockHeader::GetAlgo(pblock->nVersion);
@@ -244,69 +234,65 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
     arith_uint256 refBlockTarget;
 
     // We don't want to recalculate the average of several days' worth of block targets here every single time, so instead we cache the average and start height
-    const bool fUseCache = false;
-    arith_uint256 refBlockTargetCache;
-    // For lack of a better way to store an atomic uint256 at the moment
-    static std::atomic<uint64_t> targetCacheOne{0};
-    static std::atomic<uint64_t> targetCacheTwo{0};
-    static std::atomic<uint64_t> targetCacheThree{0};
-    static std::atomic<uint64_t> targetCacheFour{0};
-    static std::atomic_int nTargetCacheHeight{-1};
-    static std::atomic_int nTargetCacheAlgo{CBlockHeader::ALGO_COUNT};
-    if (fUseCache)
-        AtomicToArith256(refBlockTargetCache, targetCacheOne, targetCacheTwo, targetCacheThree, targetCacheFour);
+    const bool fUseCache = true;
+    {
+        LOCK(cs_target_cache);
 
-    if (nASERTBlockTargetsToAverage > 0 && nHeight >= nASERTStartHeight + nASERTBlockTargetsToAverage && nHeightDiff >= nASERTBlockTargetsToAverage) {
-        if (!fUseCache || nTargetCacheHeight.load() != (int)(nHeightDiff / nASERTBlockTargetsToAverage) || nTargetCacheAlgo.load() != algo || refBlockTargetCache == arith_uint256() || algo == -1) {
-            const uint32_t nBlocksToSkip = nHeightDiff % nASERTBlockTargetsToAverage;
-            const CBlockIndex* pindex = pindexPrev;
-            //LogPrintf("nBlocksToSkip = %u\n", nBlocksToSkip);
+        static arith_uint256 refBlockTargetCache;
+        static int nTargetCacheHeight = -1;
+        static int nTargetCacheAlgo = CBlockHeader::ALGO_COUNT;
 
-            for (unsigned int i = 0; i < nBlocksToSkip; i++) {
-                pindex = algo == -1 ? GetLastBlockIndex(pindex->pprev, fProofOfStake) : GetLastBlockIndexForAlgo(pindex->pprev, algo);
-            }
-            //LogPrintf("begin pindex->nHeight = %i\n", pindex->nHeight);
+        if (nASERTBlockTargetsToAverage > 0 && nHeight >= nASERTStartHeight + nASERTBlockTargetsToAverage && nHeightDiff >= nASERTBlockTargetsToAverage) {
+            if (!fUseCache || nTargetCacheHeight != (int)(nHeightDiff / nASERTBlockTargetsToAverage) || nTargetCacheAlgo != algo || refBlockTargetCache == arith_uint256() || algo == -1) {
+                const uint32_t nBlocksToSkip = nHeightDiff % nASERTBlockTargetsToAverage;
+                const CBlockIndex* pindex = pindexPrev;
+                //LogPrintf("nBlocksToSkip = %u\n", nBlocksToSkip);
 
-            //unsigned int nBlocksAveraged = 0;
-            for (int i = 0; i < (int)nASERTBlockTargetsToAverage; i++) {
-                if (pindex->nBits != (nProofOfWorkLimit - 1) || !params.fPowAllowMinDifficultyBlocks) { // Don't add min difficulty targets to the average
-                    arith_uint256 bnTarget = arith_uint256().SetCompact(pindex->nBits);
-                    refBlockTarget += bnTarget / nASERTBlockTargetsToAverage;
-                    //nBlocksAveraged++;
-                    //if (pindex->GetBlockHash() == params.hashGenesisBlock)
-                        //LogPrintf("Averaging genesis block target\n");
-                } else
-                    i--; // Average one more block to make up for the one we skipped
-                pindex = algo == -1 ? GetLastBlockIndex(pindex->pprev, fProofOfStake) : GetLastBlockIndexForAlgo(pindex->pprev, algo);
-                if (!pindex)
-                    break;
-            }
-            //LogPrintf("nBlocksAveraged = %u\n", nBlocksAveraged);
-            //assert(nBlocksAveraged == nASERTBlockTargetsToAverage);
-            //if (pindex)
-                //LogPrintf("end pindex->nHeight = %i\n", pindex->nHeight);
-            if (fUseCache) {
-                Arith256ToAtomic(refBlockTarget, targetCacheOne, targetCacheTwo, targetCacheThree, targetCacheFour);
-                nTargetCacheHeight.store(nHeightDiff / nASERTBlockTargetsToAverage);
-                nTargetCacheAlgo.store(algo);
-                //LogPrintf("Set average target cache at nHeight = %u with algo = %i\n", nHeight, algo);
+                for (unsigned int i = 0; i < nBlocksToSkip; i++) {
+                    pindex = algo == -1 ? GetLastBlockIndex(pindex->pprev, fProofOfStake) : GetLastBlockIndexForAlgo(pindex->pprev, algo);
+                }
+                //LogPrintf("begin pindex->nHeight = %i\n", pindex->nHeight);
+
+                //unsigned int nBlocksAveraged = 0;
+                for (int i = 0; i < (int)nASERTBlockTargetsToAverage; i++) {
+                    if (pindex->nBits != (nProofOfWorkLimit - 1) || !params.fPowAllowMinDifficultyBlocks) { // Don't add min difficulty targets to the average
+                        arith_uint256 bnTarget = arith_uint256().SetCompact(pindex->nBits);
+                        refBlockTarget += bnTarget / nASERTBlockTargetsToAverage;
+                        //nBlocksAveraged++;
+                        //if (pindex->GetBlockHash() == params.hashGenesisBlock)
+                            //LogPrintf("Averaging genesis block target\n");
+                    } else
+                        i--; // Average one more block to make up for the one we skipped
+                    pindex = algo == -1 ? GetLastBlockIndex(pindex->pprev, fProofOfStake) : GetLastBlockIndexForAlgo(pindex->pprev, algo);
+                    if (!pindex)
+                        break;
+                }
+                //LogPrintf("nBlocksAveraged = %u\n", nBlocksAveraged);
+                //assert(nBlocksAveraged == nASERTBlockTargetsToAverage);
+                //if (pindex)
+                    //LogPrintf("end pindex->nHeight = %i\n", pindex->nHeight);
+                if (fUseCache) {
+                    refBlockTargetCache = refBlockTarget;
+                    nTargetCacheHeight = nHeightDiff / nASERTBlockTargetsToAverage;
+                    nTargetCacheAlgo = algo;
+                    //LogPrintf("Set average target cache at nHeight = %u with algo = %i\n", nHeight, algo);
+                }
+            } else {
+                refBlockTarget = refBlockTargetCache;
+                //LogPrintf("Using average target cache at nHeight = %u with algo = %i\n", nHeight, algo);
             }
         } else {
-            refBlockTarget = refBlockTargetCache;
-            //LogPrintf("Using average target cache at nHeight = %u with algo = %i\n", nHeight, algo);
+            if (fUseCache && algo != -1) {
+                if (nTargetCacheHeight != -1 || nTargetCacheAlgo != algo || refBlockTargetCache == arith_uint256()) {
+                    refBlockTargetCache = arith_uint256().SetCompact(pindexReferenceBlock->nBits);
+                    nTargetCacheHeight = -1;
+                    nTargetCacheAlgo = algo;
+                    //LogPrintf("Set ref target cache at nHeight = %u with algo = %i\n", nHeight, algo);
+                }
+                refBlockTarget = refBlockTargetCache;
+            } else
+                refBlockTarget = arith_uint256().SetCompact(pindexReferenceBlock->nBits);
         }
-    } else {
-        if (fUseCache && algo != -1) {
-            if (nTargetCacheAlgo.load() != algo || refBlockTargetCache == arith_uint256()) {
-                refBlockTargetCache = arith_uint256().SetCompact(pindexReferenceBlock->nBits);
-                Arith256ToAtomic(refBlockTargetCache, targetCacheOne, targetCacheTwo, targetCacheThree, targetCacheFour);
-                nTargetCacheHeight.store(-1);
-                nTargetCacheAlgo.store(algo);
-                //LogPrintf("Set ref target cache at nHeight = %u with algo = %i\n", nHeight, algo);
-            }
-            refBlockTarget = refBlockTargetCache;
-        } else
-            refBlockTarget = arith_uint256().SetCompact(pindexReferenceBlock->nBits);
     }
 
     //LogPrintf("nHeight = %u, algo = %i, refBlockTarget = %s\n", nHeight, algo, refBlockTarget.ToString().c_str());
@@ -316,9 +302,9 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
     const uint32_t divisor = params.nPowTargetTimespan; // Must be positive
     const int exponent = dividend / divisor; // Note: this integer division rounds down positive and rounds up negative numbers via truncation, but the truncated fractional part is handled by the approximation below
     const uint32_t remainder = fPositive ? dividend % divisor : -dividend % divisor; // Must be positive
-    // We are using uint256 rather than uint64_t here because a nPowTargetTimespan of more than 3 days in the divisor may cause the following cubic approximation to overflow a uint64_t
-    arith_uint256 numerator = 1;
-    arith_uint256 denominator = 1;
+    // We are using uint512 rather than uint64_t here because a nPowTargetTimespan of more than 3 days in the divisor may cause the following cubic approximation to overflow a uint64_t
+    arith_uint512 numerator = 1;
+    arith_uint512 denominator = 1;
     // Alternatively, ensure that the nPowTargetTimespan (divisor) is small enough such that (2*2*2) * (4 + 11 + 35 + 50) * (divisor)^3 < (2^64 - 1) which is the uint64_t maximum value to leave some room and make overflow extremely unlikely
     //assert(divisor <= (3 * 24 * 60 * 60));
     // Keep in mind that a large exponent due to being extremely far ahead or behind schedule, especially in case of reviving an abandoned chain, will also lead to overflowing the numerator, so a less accurate approximation should be used in this case
@@ -334,12 +320,12 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
             //numerator *= remainder + divisor; // x+1
             //denominator *= divisor;
 
-            const arith_uint256 bnDivisor(divisor);
-            const arith_uint256 bnRemainder(remainder);
+            const arith_uint512 bnDivisor(divisor);
+            const arith_uint512 bnRemainder(remainder);
             numerator = numerator * ((4 * bnRemainder*bnRemainder*bnRemainder) + (11 * bnRemainder*bnRemainder * bnDivisor) + (35 * bnRemainder * bnDivisor*bnDivisor) + (50 * bnDivisor*bnDivisor*bnDivisor));
             denominator = denominator * (50 * bnDivisor*bnDivisor*bnDivisor);
-            //numerator = numerator * ((4ull * remainder*remainder*remainder) + (11ull * remainder*remainder * divisor) + (35ull * remainder * divisor*divisor) + (50ull * divisor*divisor*divisor));
-            //denominator = denominator * (50ull * divisor*divisor*divisor);
+            //numerator = numerator * ((4lu * remainder*remainder*remainder) + (11lu * remainder*remainder * divisor) + (35lu * remainder * divisor*divisor) + (50lu * divisor*divisor*divisor));
+            //denominator = denominator * (50lu * divisor*divisor*divisor);
         }
     } else {
         for (int i = 0; i > exponent; i--)
@@ -349,12 +335,12 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
             //numerator *= divisor;
             //denominator *= remainder + divisor; // x+1
 
-            const arith_uint256 bnDivisor(divisor);
-            const arith_uint256 bnRemainder(remainder);
+            const arith_uint512 bnDivisor(divisor);
+            const arith_uint512 bnRemainder(remainder);
             numerator = numerator * (50 * bnDivisor*bnDivisor*bnDivisor);
             denominator = denominator * ((4 * bnRemainder*bnRemainder*bnRemainder) + (11 * bnRemainder*bnRemainder * bnDivisor) + (35 * bnRemainder * bnDivisor*bnDivisor) + (50 * bnDivisor*bnDivisor*bnDivisor));
-            //numerator = numerator * (50ull * divisor*divisor*divisor);
-            //denominator = denominator * ((4ull * remainder*remainder*remainder) + (11ull * remainder*remainder * divisor) + (35ull * remainder * divisor*divisor) + (50ull * divisor*divisor*divisor));
+            //numerator = numerator * (50lu * divisor*divisor*divisor);
+            //denominator = denominator * ((4lu * remainder*remainder*remainder) + (11lu * remainder*remainder * divisor) + (35lu * remainder * divisor*divisor) + (50lu * divisor*divisor*divisor));
         }
     }
 
