@@ -8,6 +8,7 @@
 
 #include <optional.h>
 #include <primitives/block.h>
+#include <pubkey.h>
 #include <txmempool.h>
 #include <validation.h>
 
@@ -210,7 +211,7 @@ private:
 };
 
 /** Modify the extranonce in a block */
-void IncrementExtraNonce(CBlock* pblock, const CBlockIndex* pindexPrev, unsigned int& nExtraNonce);
+void IncrementExtraNonce(CBlock* pblock, const CBlockIndex* pindexPrev, unsigned int& nExtraNonce, const CPubKey* signingPubKey = nullptr);
 int64_t UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, const CBlockIndex* pindexPrev);
 
 /** Update an old GenerateCoinbaseCommitment from CreateNewBlock after the block txs have changed */
@@ -221,6 +222,6 @@ namespace boost {
 } // namespace boost
 
 bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shared_ptr<CWallet> pwallet, const int& nHeight, const CBlockIndex* pindexPrev, const Consensus::Params& consensusParams);
-void MintStake(boost::thread_group& threadGroup, std::shared_ptr<CWallet> pwallet, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool);
+void MintStake(boost::thread_group& threadGroup, std::shared_ptr<CWallet> pwallet, const unsigned int walletNum, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool);
 
 #endif // BITCOIN_MINER_H

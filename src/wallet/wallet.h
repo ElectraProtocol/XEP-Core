@@ -984,7 +984,8 @@ public:
      */
     void CommitTransaction(CTransactionRef tx, mapValue_t mapValue, std::vector<std::pair<std::string, std::string>> orderForm);
     bool SelectStakeCoins(std::set<CInputCoin>& setCoins) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
-    bool SignBlock(CBlock& block) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+    bool GetBlockSigningPubKey(const CBlock& block, CPubKey& pubkey, bool& pubkeyInSig) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+    bool SignBlock(CBlock& block, const CPubKey& pubkey) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
 
     bool DummySignTx(CMutableTransaction &txNew, const std::set<CTxOut> &txouts, bool use_max_sig = false) const
     {
