@@ -5751,7 +5751,7 @@ bool CheckBlockSignature(const CBlock& block)
             if ((pubkeyStart + CPubKey::COMPRESSED_SIZE) > txin.scriptSig.size() || txin.scriptSig[pubkeyStart-1] < CPubKey::COMPRESSED_SIZE) // last pushdata must be large enough to at least hold a compressed pubkey
                 return error("%s : p2pkh txin.scriptSig.size() = %u is too small", __func__, txin.scriptSig.size());
             pubkey = CPubKey(txin.scriptSig.begin()+pubkeyStart, txin.scriptSig.end());
-        } else if (cbtxin.scriptSig.size() > CPubKey::COMPRESSED_SIZE) { // check for pubkey in coinbase
+        } else if (cbtxin.scriptSig.size() > CPubKey::COMPRESSED_SIZE && cbtxin.scriptSig[cbtxin.scriptSig.size()-CPubKey::COMPRESSED_SIZE-1] == CPubKey::COMPRESSED_SIZE) { // check for pubkey in coinbase
             //std::vector<unsigned char> vchPubKey(cbtxin.scriptSig.end()-CPubKey::COMPRESSED_SIZE, cbtxin.scriptSig.end());
             //LogPrintf("%s : coinbase cbtxin.scriptSig = %s\n", __func__, HexStr(cbtxin.scriptSig));
             //LogPrintf("%s : cbtxin.scriptSig.size() = %u, vchPubKey = %s\n", __func__, cbtxin.scriptSig.size(), HexStr(vchPubKey));
