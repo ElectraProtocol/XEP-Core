@@ -171,7 +171,7 @@ UpdateWalletDialog::~UpdateWalletDialog()
 
 void UpdateWalletDialog::checkForUpdate()
 {
-    const QUrl strVerUrl = QUrl("https://raw.githubusercontent.com/ElectraProtocol/xep-ecosystem-versions/main/XEP-Core/latestversion.json");
+    const QUrl strVerUrl = QUrl("http://electraprotocol.eu/getlatestversion");
 
     const QNetworkRequest request(strVerUrl);
     reply = manager->get(request);
