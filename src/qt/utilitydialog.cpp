@@ -171,9 +171,9 @@ UpdateWalletDialog::~UpdateWalletDialog()
 
 void UpdateWalletDialog::checkForUpdate()
 {
-    const QString VERSION_URL = "https://raw.githubusercontent.com/ElectraProtocol/xep-ecosystem-versions/main/XEP-Core/latestversion.json";
+    const QUrl strVerUrl = QUrl("http://electraprotocol.eu/getlatestversion");
 
-    const QNetworkRequest request(VERSION_URL);
+    const QNetworkRequest request(strVerUrl);
     reply = manager->get(request);
 }
 
@@ -183,40 +183,42 @@ void UpdateWalletDialog::gotReply()
         const QByteArray response_data = reply->readAll();
         delete reply;
         const QJsonDocument jsonAnswer = QJsonDocument::fromJson(response_data);
-        const QJsonObject &responseObject = jsonAnswer.object();
+        if (jsonAnswer.isObject()) {
+            const QJsonObject &responseObject = jsonAnswer.object();
 
-        const QString strVerMajor = "version_major";
-        const QString strVerMinor = "version_minor";
-        const QString strVerRev = "version_revision";
-        const QString strVerBuild = "version_build";
-        const QString strVerRC = "version_rc";
-        const QString strMandatory = "mandatory";
-        const QString strLastMandatory = "lastmandatory";
+            const QString strVerMajor = "version_major";
+            const QString strVerMinor = "version_minor";
+            const QString strVerRev = "version_revision";
+            const QString strVerBuild = "version_build";
+            const QString strVerRC = "version_rc";
+            const QString strMandatory = "mandatory";
+            const QString strLastMandatory = "lastmandatory";
 
-        if (responseObject.size() == 7 && responseObject[strVerMajor].isDouble() && responseObject[strVerMinor].isDouble() &&
-            responseObject[strVerRev].isDouble() && responseObject[strVerBuild].isDouble() && responseObject[strVerRC].isDouble() &&
-            responseObject[strMandatory].isBool() && responseObject[strLastMandatory].isObject()) {
-            const QJsonObject &lastMandatory = responseObject[strLastMandatory].toObject();
-            if (lastMandatory.size() == 5 && lastMandatory[strVerMajor].isDouble() && lastMandatory[strVerMinor].isDouble() &&
-                lastMandatory[strVerRev].isDouble() && lastMandatory[strVerBuild].isDouble() && lastMandatory[strVerRC].isDouble()) {
-                bool outdated = true;
-                mandatoryUpdate = true;
+            if (responseObject.size() == 7 && responseObject[strVerMajor].isDouble() && responseObject[strVerMinor].isDouble() &&
+                responseObject[strVerRev].isDouble() && responseObject[strVerBuild].isDouble() && responseObject[strVerRC].isDouble() &&
+                responseObject[strMandatory].isBool() && responseObject[strLastMandatory].isObject()) {
+                const QJsonObject &lastMandatory = responseObject[strLastMandatory].toObject();
+                if (lastMandatory.size() == 5 && lastMandatory[strVerMajor].isDouble() && lastMandatory[strVerMinor].isDouble() &&
+                    lastMandatory[strVerRev].isDouble() && lastMandatory[strVerBuild].isDouble() && lastMandatory[strVerRC].isDouble()) {
+                    bool outdated = true;
+                    mandatoryUpdate = true;
 
-                newVersionMajor = responseObject[strVerMajor].toInt();
-                newVersionMinor = responseObject[strVerMinor].toInt();
-                newVersionRevision = responseObject[strVerRev].toInt();
-                newVersionBuild = responseObject[strVerBuild].toInt();
-                newVersionRC = responseObject[strVerRC].toInt();
-                if (lastMandatory[strVerMajor].toInt() <= CLIENT_VERSION_MAJOR && lastMandatory[strVerMinor].toInt() <= CLIENT_VERSION_MINOR && lastMandatory[strVerRev].toInt() <= CLIENT_VERSION_REVISION && lastMandatory[strVerBuild].toInt() <= CLIENT_VERSION_BUILD) {
-                    mandatoryUpdate = responseObject[strMandatory].toBool();
-                    if (newVersionMajor <= CLIENT_VERSION_MAJOR && newVersionMinor <= CLIENT_VERSION_MINOR && newVersionRevision <= CLIENT_VERSION_REVISION && newVersionBuild <= CLIENT_VERSION_BUILD) {
-                        outdated = false;
+                    newVersionMajor = responseObject[strVerMajor].toInt();
+                    newVersionMinor = responseObject[strVerMinor].toInt();
+                    newVersionRevision = responseObject[strVerRev].toInt();
+                    newVersionBuild = responseObject[strVerBuild].toInt();
+                    newVersionRC = responseObject[strVerRC].toInt();
+                    if (lastMandatory[strVerMajor].toInt() <= CLIENT_VERSION_MAJOR && lastMandatory[strVerMinor].toInt() <= CLIENT_VERSION_MINOR && lastMandatory[strVerRev].toInt() <= CLIENT_VERSION_REVISION && lastMandatory[strVerBuild].toInt() <= CLIENT_VERSION_BUILD) {
+                        mandatoryUpdate = responseObject[strMandatory].toBool();
+                        if (newVersionMajor <= CLIENT_VERSION_MAJOR && newVersionMinor <= CLIENT_VERSION_MINOR && newVersionRevision <= CLIENT_VERSION_REVISION && newVersionBuild <= CLIENT_VERSION_BUILD) {
+                            outdated = false;
+                        }
                     }
-                }
 
-                if (outdated) {
-                    ui->aboutMessage->setText(getUpdateString());
-                    exec();
+                    if (outdated) {
+                        ui->aboutMessage->setText(getUpdateString());
+                        exec();
+                    }
                 }
             }
         }
