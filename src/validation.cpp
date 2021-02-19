@@ -1264,17 +1264,16 @@ CAmount GetBlockSubsidy(int nHeight, bool fProofOfStake, uint64_t nCoinAge, cons
     }
 
     // 10% of reward goes to governance/treasury (90/100 goes to stakers and MNs)
-    const int nTreasuryRewardPercentage = 10;
     CAmount nSuperblockPart = 0;
     if (nHeight >= consensusParams.nTreasuryPaymentsStartBlock || nHeight >= consensusParams.nBudgetPaymentsStartBlock) {
-        nSuperblockPart = nSubsidy * nTreasuryRewardPercentage / 100;
-        nSubsidy = nSubsidy * std::max(100 - nTreasuryRewardPercentage, 0) / 100;
+        nSuperblockPart = nSubsidy * consensusParams.nTreasuryRewardPercentage / 100;
+        nSubsidy = nSubsidy * std::max(100 - consensusParams.nTreasuryRewardPercentage, 1u) / 100;
     }
 
     return fSuperblockPartOnly ? nSuperblockPart : nSubsidy;
 }
 
-bool IsTreasuryBlock(int nHeight, const Consensus::Params& consensusParams)
+static inline bool IsTreasuryBlock(int nHeight, const Consensus::Params& consensusParams)
 {
     if (nHeight <= consensusParams.nTreasuryPaymentsStartBlock) // the block reward is reduced after nTreasuryPaymentsStartBlock to later be put into a payment
         return false;
@@ -1305,8 +1304,7 @@ CAmount GetTreasuryPayment(int nHeight, const Consensus::Params& consensusParams
                 blockValue += pindex->nMint - pindex->nTreasuryPayment;
             }
         }
-        blockValue = blockValue * 10 / 9; // add back treasury payment to get original block value
-        return blockValue / 10; // 10% of block value paid to treasury
+        return blockValue * consensusParams.nTreasuryRewardPercentage / std::max(100 - consensusParams.nTreasuryRewardPercentage, 1u); // 10% of block value paid to treasury
     } else {
         return 0;
     }
@@ -2392,12 +2390,12 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
 
     if (nTreasuryPayment > 0 && IsTreasuryBlock(pindex->nHeight, chainparams.GetConsensus())) {
         const CTransaction& txNew = fProofOfStake ? *block.vtx[1] : *block.vtx[0];
-        const std::map<CScript, int>& treasuryPayees = chainparams.GetConsensus().mTreasuryPayees;
+        const std::map<CScript, unsigned int>& treasuryPayees = chainparams.GetConsensus().mTreasuryPayees;
         CAmount nActualTreasuryPayment = 0;
         nExpectedBlockReward += nTreasuryPayment;
 
         unsigned int found = 0;
-        for (const std::pair<CScript, int>& payee : treasuryPayees) {
+        for (const std::pair<CScript, unsigned int>& payee : treasuryPayees) {
             for (const CTxOut& out : txNew.vout) {
                 if (out.scriptPubKey == payee.first && out.nValue == nTreasuryPayment * payee.second / 100) {
                     nActualTreasuryPayment += out.nValue;
