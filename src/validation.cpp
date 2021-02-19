@@ -3782,7 +3782,8 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
         return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "invalid-time-mask", "block timestamp mask not valid");
 
     // Check timestamp
-    if (block.GetBlockTime() > nAdjustedTime + MAX_FUTURE_BLOCK_TIME && Params().NetworkIDString() != CBaseChainParams::REGTEST)
+    const unsigned int nFutureTimeLimit = block.nVersion >= CBlockHeader::FIRST_FORK_VERSION ? MAX_FUTURE_BLOCK_TIME : 180;
+    if (block.GetBlockTime() > nAdjustedTime + nFutureTimeLimit && Params().NetworkIDString() != CBaseChainParams::REGTEST)
         return state.Invalid(BlockValidationResult::BLOCK_TIME_FUTURE, "time-too-new", "block timestamp too far in the future");
 
     // Reject outdated version blocks when 95% (75% on testnet) of the network has upgraded:
