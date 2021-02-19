@@ -114,9 +114,9 @@ static inline void FillTreasuryPayee(CMutableTransaction& txNew, const int nHeig
     const CAmount nTreasuryPayment = GetTreasuryPayment(nHeight, consensusParams);
 
     if (nTreasuryPayment > 0) {
-        const std::map<CScript, int>& treasuryPayees = consensusParams.mTreasuryPayees;
+        const std::map<CScript, unsigned int>& treasuryPayees = consensusParams.mTreasuryPayees;
 
-        for (const std::pair<CScript, int>& payee : treasuryPayees)
+        for (const std::pair<CScript, unsigned int>& payee : treasuryPayees)
             txNew.vout.emplace_back(nTreasuryPayment * payee.second / 100, payee.first);
     }
 }
