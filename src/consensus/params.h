@@ -52,6 +52,7 @@ struct Params {
     int nBudgetPaymentsStartBlock;
     int nPoSStartBlock;
     int nLastPoWBlock;
+    int nMandatoryUpgradeBlock;
     int nTreasuryPaymentsStartBlock;
     int nTreasuryPaymentsCycleBlocks;
     std::map<CScript, unsigned int> mTreasuryPayees;
