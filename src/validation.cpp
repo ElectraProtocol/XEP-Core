@@ -2019,8 +2019,14 @@ static inline bool ContextualCheckPoSBlock(const CBlock& block, const bool& fPro
     bool fGeneratedStakeModifier = false;
     //if (!ComputeNextStakeModifier(pindex, nStakeModifier, fGeneratedStakeModifier))
         //return error("ConnectBlock(): ComputeNextStakeModifier() failed");
-    nStakeModifier = ComputeStakeModifierV3(pindex->pprev, pindex->GetBlockHash());
-    fGeneratedStakeModifier = true;
+    if (pindex->nHeight >= params.nMandatoryUpgradeBlock) {
+        // The stake modifier kernel must be derived from some data which cannot be changed without invalidating the entire block in order to prevent stake grinding
+        nStakeModifier = ComputeStakeModifierV3(pindex->pprev, fProofOfStake ? block.vtx[1]->vin[0].prevout.hash : pindex->GetBlockHash());
+        fGeneratedStakeModifier = true;
+    } else {
+        nStakeModifier = ComputeStakeModifierV3(pindex->pprev, pindex->GetBlockHash());
+        fGeneratedStakeModifier = true;
+    }
     //nStakeModifierV2 = ComputeStakeModifierV2(pindex->pprev, fProofOfStake ? block.vtx[1]->vin[0].prevout.hash : pindex->GetBlockHash());
     //fGeneratedStakeModifier = true;
 
