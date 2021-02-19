@@ -1803,11 +1803,15 @@ DisconnectResult CChainState::DisconnectBlock(const CBlock& block, const CBlockI
         // Check that all outputs are available and match the outputs in the block itself
         // exactly.
         for (size_t o = 0; o < tx.vout.size(); o++) {
-            if (!tx.vout[o].scriptPubKey.IsUnspendable()) {
+            if (!tx.vout[o].scriptPubKey.IsUnspendable() && tx.vout[o].nValue != 0 && !tx.vout[o].scriptPubKey.empty()) {
                 COutPoint out(hash, o);
                 Coin coin;
                 bool is_spent = view.SpendCoin(out, &coin);
                 if (!is_spent || tx.vout[o] != coin.out || pindex->nHeight != coin.nHeight || is_coinbase != coin.fCoinBase || is_coinstake != coin.fCoinStake) {
+                    // Don't mark as unclean if this output is from an empty, unspendable coinbase transaction that has been duplicated (SpendCoin does move and invalidate its Coin object, but we shouldn't be disconnecting any blocks from prior to nMandatoryUpgradeBlock)
+                    //if (!is_spent || coin.out != CTxOut() || coin.nHeight != 0 || coin.fCoinBase || coin.fCoinStake || tx.vout[o] != CTxOut(0, CScript()) || !is_coinbase)
+                        //fClean = false; // transaction output mismatch
+
                     fClean = false; // transaction output mismatch
                 }
             }
@@ -2341,7 +2345,7 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
         }
         nValueOut += tx.GetValueOut();
         for (const CTxOut& tx_out : tx.vout) {
-            if (tx_out.scriptPubKey.IsUnspendable())
+            if (tx_out.scriptPubKey.IsUnspendable() || tx_out.scriptPubKey.empty())
                 nAmountBurned += tx_out.nValue;
         }
 
