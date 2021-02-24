@@ -225,7 +225,13 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
     const CBlockIndex* pindexReferenceBlock = GetASERTReferenceBlockAndHeightForAlgo(pindexPrev, nProofOfWorkLimit, nASERTStartHeight, algo, nBlocksPassed);
     const CBlockIndex* pindexReferenceBlockPrev = algo == -1 ? GetLastBlockIndex(pindexReferenceBlock->pprev, fProofOfStake) : GetLastBlockIndexForAlgo(pindexReferenceBlock->pprev, algo);
     // Use reference block's parent block's timestamp unless it is the genesis (not using the prev timestamp here would put us permanently one block behind schedule)
-    const int64_t nTimeDiff = pindexPrev->GetBlockTime() - (pindexReferenceBlockPrev ? pindexReferenceBlockPrev->GetBlockTime() : (pindexReferenceBlock->GetBlockTime() - nTargetSpacing));
+    int64_t refBlockTimestamp = pindexReferenceBlockPrev ? pindexReferenceBlockPrev->GetBlockTime() : (pindexReferenceBlock->GetBlockTime() - nTargetSpacing);
+    // The reference timestamp must be divisible by (nStakeTimestampMask+1) or else the PoS block emission will never be exactly on schedule
+    if (fProofOfStake) {
+        while ((refBlockTimestamp & params.nStakeTimestampMask) != 0)
+            refBlockTimestamp++;
+    }
+    const int64_t nTimeDiff = pindexPrev->GetBlockTime() - refBlockTimestamp;
     //LogPrintf("pindexReferenceBlock->GetBlockHash() = %s\n", pindexReferenceBlock->GetBlockHash().ToString().c_str());
     //LogPrintf("nBlocksPassed = %u\n", nBlocksPassed);
     //LogPrintf("pindexPrev->nHeight + 1 - pindexReferenceBlock->nHeight = %u\n", pindexPrev->nHeight + 1 - pindexReferenceBlock->nHeight);
