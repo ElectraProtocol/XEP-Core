@@ -118,6 +118,7 @@ public Q_SLOTS:
 
 Q_SIGNALS:
     void setPrivacy(bool privacy);
+    void setOrphansHidden(bool hidden);
     void transactionClicked();
     void coinsSent();
     /**  Fired when a message should be reported to the user */

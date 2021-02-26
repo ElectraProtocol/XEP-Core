@@ -319,6 +319,13 @@ void TransactionView::chooseType(int idx)
         typeWidget->itemData(idx).toInt());
 }
 
+void TransactionView::setOrphansHidden(bool hidden)
+{
+    if (!transactionProxyModel)
+        return;
+    transactionProxyModel->setHideOrphans(hidden);
+}
+
 void TransactionView::chooseWatchonly(int idx)
 {
     if(!transactionProxyModel)
