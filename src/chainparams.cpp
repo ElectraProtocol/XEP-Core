@@ -91,7 +91,7 @@ public:
         consensus.nSubsidyHalvingInterval = 210000;
         consensus.nBudgetPaymentsStartBlock = std::numeric_limits<int>::max();
         consensus.nPoSStartBlock = 0;
-        consensus.nLastPoWBlock = std::numeric_limits<int>::max();
+        consensus.nLastPoWBlock = 150000;
         consensus.nMandatoryUpgradeBlock = 150000;
         consensus.nTreasuryPaymentsStartBlock = std::numeric_limits<int>::max();
         consensus.BIP16Exception = uint256{};
