@@ -208,9 +208,15 @@ void UpdateWalletDialog::gotReply()
                     newVersionRevision = responseObject[strVerRev].toInt();
                     newVersionBuild = responseObject[strVerBuild].toInt();
                     newVersionRC = responseObject[strVerRC].toInt();
-                    if (lastMandatory[strVerMajor].toInt() <= CLIENT_VERSION_MAJOR && lastMandatory[strVerMinor].toInt() <= CLIENT_VERSION_MINOR && lastMandatory[strVerRev].toInt() <= CLIENT_VERSION_REVISION && lastMandatory[strVerBuild].toInt() <= CLIENT_VERSION_BUILD) {
+                    if (lastMandatory[strVerMajor].toInt() < CLIENT_VERSION_MAJOR || (lastMandatory[strVerMajor].toInt() == CLIENT_VERSION_MAJOR && lastMandatory[strVerMinor].toInt() < CLIENT_VERSION_MINOR) ||
+                        (lastMandatory[strVerMajor].toInt() == CLIENT_VERSION_MAJOR && lastMandatory[strVerMinor].toInt() == CLIENT_VERSION_MINOR && lastMandatory[strVerRev].toInt() < CLIENT_VERSION_REVISION) ||
+                        (lastMandatory[strVerMajor].toInt() == CLIENT_VERSION_MAJOR && lastMandatory[strVerMinor].toInt() == CLIENT_VERSION_MINOR && lastMandatory[strVerRev].toInt() == CLIENT_VERSION_REVISION &&
+                         lastMandatory[strVerBuild].toInt() < CLIENT_VERSION_BUILD)) {
                         mandatoryUpdate = responseObject[strMandatory].toBool();
-                        if (newVersionMajor <= CLIENT_VERSION_MAJOR && newVersionMinor <= CLIENT_VERSION_MINOR && newVersionRevision <= CLIENT_VERSION_REVISION && newVersionBuild <= CLIENT_VERSION_BUILD) {
+                        if (newVersionMajor < CLIENT_VERSION_MAJOR || (newVersionMajor == CLIENT_VERSION_MAJOR && newVersionMinor < CLIENT_VERSION_MINOR) ||
+                            (newVersionMajor == CLIENT_VERSION_MAJOR && newVersionMinor == CLIENT_VERSION_MINOR && newVersionRevision < CLIENT_VERSION_REVISION) ||
+                            (newVersionMajor == CLIENT_VERSION_MAJOR && newVersionMinor == CLIENT_VERSION_MINOR && newVersionRevision == CLIENT_VERSION_REVISION &&
+                             newVersionBuild < CLIENT_VERSION_BUILD)) {
                             outdated = false;
                         }
                     }
