@@ -88,6 +88,8 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     connect(transactionView, &TransactionView::message, this, &WalletView::message);
 
     connect(this, &WalletView::setPrivacy, overviewPage, &OverviewPage::setPrivacy);
+    connect(this, &WalletView::setOrphansHidden, overviewPage, &OverviewPage::setOrphansHidden);
+    connect(this, &WalletView::setOrphansHidden, transactionView, &TransactionView::setOrphansHidden);
 }
 
 WalletView::~WalletView()

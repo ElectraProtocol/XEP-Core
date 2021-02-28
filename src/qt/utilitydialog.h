@@ -54,11 +54,11 @@ private:
     QNetworkAccessManager *manager = nullptr;
     QNetworkReply *reply = nullptr;
     bool mandatoryUpdate = false;
-    unsigned int newVersionMajor = 0;
-    unsigned int newVersionMinor = 0;
-    unsigned int newVersionRevision = 0;
-    unsigned int newVersionBuild = 0;
-    unsigned int newVersionRC = 0;
+    int newVersionMajor = 0;
+    int newVersionMinor = 0;
+    int newVersionRevision = 0;
+    int newVersionBuild = 0;
+    int newVersionRC = 0;
 
     void gotReply();
     QString getUpdateString();

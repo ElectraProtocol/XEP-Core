@@ -52,9 +52,11 @@ struct Params {
     int nBudgetPaymentsStartBlock;
     int nPoSStartBlock;
     int nLastPoWBlock;
+    int nMandatoryUpgradeBlock;
     int nTreasuryPaymentsStartBlock;
     int nTreasuryPaymentsCycleBlocks;
-    std::map<CScript, int> mTreasuryPayees;
+    std::map<CScript, unsigned int> mTreasuryPayees;
+    unsigned int nTreasuryRewardPercentage;
     /* Block hash that is excepted from BIP16 enforcement */
     uint256 BIP16Exception;
     /** Block height and hash at which BIP34 becomes active */

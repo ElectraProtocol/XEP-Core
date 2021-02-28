@@ -262,8 +262,10 @@ uint256 ComputeStakeModifierV2(const CBlockIndex* pindexPrev, const uint256& ker
 {
     if (!pindexPrev)
         return uint256(); // genesis block's modifier is 0
-    if (pindexPrev->nHeight == 1029999)
+    if (pindexPrev->nHeight == 0 || /*pindexPrev->nHeight == 1029999 ||*/ Params().NetworkIDString() == CBaseChainParams::REGTEST) {
+        // Give a stake modifier to the first block - fixed stake modifier only for regtest
         return uint256S("0x61106044818e45706b1694a6a28dfe23d58a2c7d4adcff81fb1aeb6d74ea6f9e");
+    }
 
     CHashWriter ss(SER_GETHASH, 0);
     ss << kernel;
