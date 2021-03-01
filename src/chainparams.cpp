@@ -91,7 +91,8 @@ public:
         consensus.nSubsidyHalvingInterval = 210000;
         consensus.nBudgetPaymentsStartBlock = std::numeric_limits<int>::max();
         consensus.nPoSStartBlock = 0;
-        consensus.nLastPoWBlock = std::numeric_limits<int>::max();
+        consensus.nLastPoWBlock = 150000;
+        consensus.nMandatoryUpgradeBlock = 150000;
         consensus.nTreasuryPaymentsStartBlock = std::numeric_limits<int>::max();
         consensus.BIP16Exception = uint256{};
         consensus.BIP34Height = 0;
@@ -125,9 +126,10 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
 
         consensus.mTreasuryPayees.emplace(CScript() << OP_0 << ParseHex("978a5064cd1fdf8c2510fe3fcbd65eaa5e98b32d"), 100); // 10% (full reward) for ep1qj799qexdrl0ccfgslcluh4j74f0f3vedatcv0k
+        consensus.nTreasuryRewardPercentage = 10; // 10% of block reward goes to treasury
 
-        consensus.nMinimumChainWork = uint256S("0x0000000000000000000000000000000000000000000000000000000000000000");
-        consensus.defaultAssumeValid = uint256S("0x0000000000000000000000000000000000000000000000000000000000000000"); // 654683
+        consensus.nMinimumChainWork = uint256S("0x00000000000000000000000000000000000000000000000035a7e986160b3cac");
+        consensus.defaultAssumeValid = uint256S("0x505286a87781aabbb6cfc7a9b735ffacd8ce73bc06ed17dae546cafe4ca3e7a3"); // 50000
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -187,7 +189,8 @@ public:
 
         checkpointData = {
             {
-                {0, uint256S("000000954c02f260a6db02c712557adcb5a7a8a0a9acfd3d3c2b3a427376c56f")},
+                { 0, uint256S("000000954c02f260a6db02c712557adcb5a7a8a0a9acfd3d3c2b3a427376c56f")},
+                { 50000, uint256S("505286a87781aabbb6cfc7a9b735ffacd8ce73bc06ed17dae546cafe4ca3e7a3")},
             }
         };
 
@@ -213,6 +216,7 @@ public:
         consensus.nBudgetPaymentsStartBlock = std::numeric_limits<int>::max();
         consensus.nPoSStartBlock = 0;
         consensus.nLastPoWBlock = std::numeric_limits<int>::max();
+        consensus.nMandatoryUpgradeBlock = 0;
         consensus.nTreasuryPaymentsStartBlock = 200;
         consensus.BIP16Exception = uint256{};
         consensus.BIP34Height = 0;
@@ -246,6 +250,7 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
 
         consensus.mTreasuryPayees.emplace(CScript() << OP_0 << ParseHex("978a5064cd1fdf8c2510fe3fcbd65eaa5e98b32d"), 100); // 10% (full reward) for ep1qj799qexdrl0ccfgslcluh4j74f0f3vedatcv0k
+        consensus.nTreasuryRewardPercentage = 10; // 10% of block reward goes to treasury
 
         consensus.nMinimumChainWork = uint256S("0x0000000000000000000000000000000000000000000000000000000000000000");
         consensus.defaultAssumeValid = uint256S("0x0000000000000000000000000000000000000000000000000000000000000000"); // 1864000
@@ -375,6 +380,7 @@ public:
         consensus.nBudgetPaymentsStartBlock = std::numeric_limits<int>::max();
         consensus.nPoSStartBlock = 0;
         consensus.nLastPoWBlock = std::numeric_limits<int>::max();
+        consensus.nMandatoryUpgradeBlock = 0;
         consensus.nTreasuryPaymentsStartBlock = 200;
         consensus.BIP16Exception = uint256{};
         consensus.BIP34Height = 1;
@@ -408,6 +414,7 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
 
         consensus.mTreasuryPayees.emplace(CScript() << OP_0 << ParseHex("978a5064cd1fdf8c2510fe3fcbd65eaa5e98b32d"), 100); // 10% (full reward) for ep1qj799qexdrl0ccfgslcluh4j74f0f3vedatcv0k
+        consensus.nTreasuryRewardPercentage = 10; // 10% of block reward goes to treasury
 
         // message start is defined as the first 4 bytes of the sha256d of the block script
         CHashWriter h(SER_DISK, 0);
@@ -461,6 +468,7 @@ public:
         consensus.nBudgetPaymentsStartBlock = std::numeric_limits<int>::max();
         consensus.nPoSStartBlock = 0;
         consensus.nLastPoWBlock = std::numeric_limits<int>::max();
+        consensus.nMandatoryUpgradeBlock = 0;
         consensus.nTreasuryPaymentsStartBlock = 30;
         consensus.BIP16Exception = uint256{};
         consensus.BIP34Height = 500; // BIP34 activated on regtest (Used in functional tests)
@@ -492,6 +500,7 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
 
         consensus.mTreasuryPayees.emplace(CScript() << OP_0 << ParseHex("978a5064cd1fdf8c2510fe3fcbd65eaa5e98b32d"), 100); // 10% (full reward) for ep1qj799qexdrl0ccfgslcluh4j74f0f3vedatcv0k
+        consensus.nTreasuryRewardPercentage = 10; // 10% of block reward goes to treasury
 
         consensus.nMinimumChainWork = uint256{};
         consensus.defaultAssumeValid = uint256{};

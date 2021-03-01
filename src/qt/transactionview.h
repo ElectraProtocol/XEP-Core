@@ -115,6 +115,7 @@ Q_SIGNALS:
 public Q_SLOTS:
     void chooseDate(int idx);
     void chooseType(int idx);
+    void setOrphansHidden(bool hidden);
     void chooseWatchonly(int idx);
     void changedAmount();
     void changedSearch();

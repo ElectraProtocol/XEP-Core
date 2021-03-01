@@ -114,9 +114,9 @@ static inline void FillTreasuryPayee(CMutableTransaction& txNew, const int nHeig
     const CAmount nTreasuryPayment = GetTreasuryPayment(nHeight, consensusParams);
 
     if (nTreasuryPayment > 0) {
-        const std::map<CScript, int>& treasuryPayees = consensusParams.mTreasuryPayees;
+        const std::map<CScript, unsigned int>& treasuryPayees = consensusParams.mTreasuryPayees;
 
-        for (const std::pair<CScript, int>& payee : treasuryPayees)
+        for (const std::pair<CScript, unsigned int>& payee : treasuryPayees)
             txNew.vout.emplace_back(nTreasuryPayment * payee.second / 100, payee.first);
     }
 }
@@ -597,7 +597,7 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                     LogPrintf("%s : parsed kernel type=%s\n", __func__, GetTxnOutputType(whichType));
 
                 if (whichType == TxoutType::PUBKEY || whichType == TxoutType::PUBKEYHASH || whichType == TxoutType::WITNESS_V0_KEYHASH || whichType == TxoutType::SCRIPTHASH || whichType == TxoutType::WITNESS_V0_SCRIPTHASH) { // we support p2pkh, p2wpkh, p2sh-p2wpkh, and p2sh/p2wsh-multisig inputs
-                    const bool fNewStakingCodeActive = Params().NetworkIDString() != CBaseChainParams::MAIN;
+                    const bool fNewStakingCodeActive = nHeight >= consensusParams.nMandatoryUpgradeBlock;
                     if (whichType == TxoutType::SCRIPTHASH || whichType == TxoutType::WITNESS_V0_SCRIPTHASH) { // a p2sh/p2wsh input could be many things, but we only support p2sh-p2wpkh and multisig for now
                         CScript subscript;
                         std::unique_ptr<SigningProvider> provider = pwallet->GetSolvingProvider(scriptPubKeyKernel);

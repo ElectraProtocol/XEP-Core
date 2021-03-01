@@ -1264,17 +1264,16 @@ CAmount GetBlockSubsidy(int nHeight, bool fProofOfStake, uint64_t nCoinAge, cons
     }
 
     // 10% of reward goes to governance/treasury (90/100 goes to stakers and MNs)
-    const int nTreasuryRewardPercentage = 10;
     CAmount nSuperblockPart = 0;
     if (nHeight >= consensusParams.nTreasuryPaymentsStartBlock || nHeight >= consensusParams.nBudgetPaymentsStartBlock) {
-        nSuperblockPart = nSubsidy * nTreasuryRewardPercentage / 100;
-        nSubsidy = nSubsidy * std::max(100 - nTreasuryRewardPercentage, 0) / 100;
+        nSuperblockPart = nSubsidy * consensusParams.nTreasuryRewardPercentage / 100;
+        nSubsidy = nSubsidy * std::max(100 - consensusParams.nTreasuryRewardPercentage, 1u) / 100;
     }
 
     return fSuperblockPartOnly ? nSuperblockPart : nSubsidy;
 }
 
-bool IsTreasuryBlock(int nHeight, const Consensus::Params& consensusParams)
+static inline bool IsTreasuryBlock(int nHeight, const Consensus::Params& consensusParams)
 {
     if (nHeight <= consensusParams.nTreasuryPaymentsStartBlock) // the block reward is reduced after nTreasuryPaymentsStartBlock to later be put into a payment
         return false;
@@ -1305,8 +1304,7 @@ CAmount GetTreasuryPayment(int nHeight, const Consensus::Params& consensusParams
                 blockValue += pindex->nMint - pindex->nTreasuryPayment;
             }
         }
-        blockValue = blockValue * 10 / 9; // add back treasury payment to get original block value
-        return blockValue / 10; // 10% of block value paid to treasury
+        return blockValue * consensusParams.nTreasuryRewardPercentage / std::max(100 - consensusParams.nTreasuryRewardPercentage, 1u); // 10% of block value paid to treasury
     } else {
         return 0;
     }
@@ -1805,11 +1803,15 @@ DisconnectResult CChainState::DisconnectBlock(const CBlock& block, const CBlockI
         // Check that all outputs are available and match the outputs in the block itself
         // exactly.
         for (size_t o = 0; o < tx.vout.size(); o++) {
-            if (!tx.vout[o].scriptPubKey.IsUnspendable()) {
+            if (!tx.vout[o].scriptPubKey.IsUnspendable() && tx.vout[o].nValue != 0 && !tx.vout[o].scriptPubKey.empty()) {
                 COutPoint out(hash, o);
                 Coin coin;
                 bool is_spent = view.SpendCoin(out, &coin);
                 if (!is_spent || tx.vout[o] != coin.out || pindex->nHeight != coin.nHeight || is_coinbase != coin.fCoinBase || is_coinstake != coin.fCoinStake) {
+                    // Don't mark as unclean if this output is from an empty, unspendable coinbase transaction that has been duplicated (SpendCoin does move and invalidate its Coin object, but we shouldn't be disconnecting any blocks from prior to nMandatoryUpgradeBlock)
+                    //if (!is_spent || coin.out != CTxOut() || coin.nHeight != 0 || coin.fCoinBase || coin.fCoinStake || tx.vout[o] != CTxOut(0, CScript()) || !is_coinbase)
+                        //fClean = false; // transaction output mismatch
+
                     fClean = false; // transaction output mismatch
                 }
             }
@@ -2017,8 +2019,14 @@ static inline bool ContextualCheckPoSBlock(const CBlock& block, const bool& fPro
     bool fGeneratedStakeModifier = false;
     //if (!ComputeNextStakeModifier(pindex, nStakeModifier, fGeneratedStakeModifier))
         //return error("ConnectBlock(): ComputeNextStakeModifier() failed");
-    nStakeModifier = ComputeStakeModifierV3(pindex->pprev, pindex->GetBlockHash());
-    fGeneratedStakeModifier = true;
+    if (pindex->nHeight >= params.nMandatoryUpgradeBlock) {
+        // The stake modifier kernel must be derived from some data which cannot be changed without invalidating the entire block in order to prevent stake grinding
+        nStakeModifier = ComputeStakeModifierV3(pindex->pprev, fProofOfStake ? block.vtx[1]->vin[0].prevout.hash : pindex->GetBlockHash());
+        fGeneratedStakeModifier = true;
+    } else {
+        nStakeModifier = ComputeStakeModifierV3(pindex->pprev, pindex->GetBlockHash());
+        fGeneratedStakeModifier = true;
+    }
     //nStakeModifierV2 = ComputeStakeModifierV2(pindex->pprev, fProofOfStake ? block.vtx[1]->vin[0].prevout.hash : pindex->GetBlockHash());
     //fGeneratedStakeModifier = true;
 
@@ -2142,7 +2150,8 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "PoW-ended", strprintf("%s: PoW period ended", __func__));
 
     if (!pindex->GeneratedStakeModifier() && /*pindex->nStakeModifierChecksum == 0 &&*/ !ContextualCheckPoSBlock(block, fProofOfStake, state, view, pindex, chainparams.GetConsensus(), fJustCheck))
-        return error("%s: failed PoS check %s", __func__, state.ToString());
+        return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-pos", "proof of stake is incorrect"); // return invalid state here because we don't check in AcceptBlock
+        //return error("%s: failed PoS check %s", __func__, state.ToString());
 
     bool fScriptChecks = true;
     if (!hashAssumeValid.IsNull()) {
@@ -2342,7 +2351,7 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
         }
         nValueOut += tx.GetValueOut();
         for (const CTxOut& tx_out : tx.vout) {
-            if (tx_out.scriptPubKey.IsUnspendable())
+            if (tx_out.scriptPubKey.IsUnspendable() || tx_out.scriptPubKey.empty())
                 nAmountBurned += tx_out.nValue;
         }
 
@@ -2391,12 +2400,12 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
 
     if (nTreasuryPayment > 0 && IsTreasuryBlock(pindex->nHeight, chainparams.GetConsensus())) {
         const CTransaction& txNew = fProofOfStake ? *block.vtx[1] : *block.vtx[0];
-        const std::map<CScript, int>& treasuryPayees = chainparams.GetConsensus().mTreasuryPayees;
+        const std::map<CScript, unsigned int>& treasuryPayees = chainparams.GetConsensus().mTreasuryPayees;
         CAmount nActualTreasuryPayment = 0;
         nExpectedBlockReward += nTreasuryPayment;
 
         unsigned int found = 0;
-        for (const std::pair<CScript, int>& payee : treasuryPayees) {
+        for (const std::pair<CScript, unsigned int>& payee : treasuryPayees) {
             for (const CTxOut& out : txNew.vout) {
                 if (out.scriptPubKey == payee.first && out.nValue == nTreasuryPayment * payee.second / 100) {
                     nActualTreasuryPayment += out.nValue;
@@ -3781,7 +3790,8 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
         return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "invalid-time-mask", "block timestamp mask not valid");
 
     // Check timestamp
-    if (block.GetBlockTime() > nAdjustedTime + MAX_FUTURE_BLOCK_TIME && Params().NetworkIDString() != CBaseChainParams::REGTEST)
+    const unsigned int nFutureTimeLimit = MAX_FUTURE_BLOCK_TIME; // block.nVersion >= CBlockHeader::FIRST_FORK_VERSION ? MAX_FUTURE_BLOCK_TIME : 180;
+    if (block.GetBlockTime() > nAdjustedTime + nFutureTimeLimit && Params().NetworkIDString() != CBaseChainParams::REGTEST)
         return state.Invalid(BlockValidationResult::BLOCK_TIME_FUTURE, "time-too-new", "block timestamp too far in the future");
 
     // Reject outdated version blocks when 95% (75% on testnet) of the network has upgraded:
@@ -3957,8 +3967,11 @@ bool BlockManager::AcceptBlockHeader(const CBlockHeader& block, BlockValidationS
             LogPrintf("ERROR: %s: prev block invalid\n", __func__);
             return state.Invalid(BlockValidationResult::BLOCK_INVALID_PREV, "bad-prevblk");
         }
-        if (!ContextualCheckBlockHeader(block, state, chainparams, pindexPrev, GetAdjustedTime()))
-            return error("%s: Consensus::ContextualCheckBlockHeader: %s, %s", __func__, hash.ToString(), state.ToString());
+        if (!ContextualCheckBlockHeader(block, state, chainparams, pindexPrev, GetAdjustedTime())) {
+            LogPrint(BCLog::VALIDATION, "%s: Consensus::ContextualCheckBlockHeader: %s, %s\n", __func__, hash.ToString(), state.ToString());
+            return false;
+            //return error("%s: Consensus::ContextualCheckBlockHeader: %s, %s", __func__, hash.ToString(), state.ToString());
+        }
 
         /* Determine if this block descends from any block which has been found
          * invalid (m_failed_blocks), then mark pindexPrev and any blocks between
