@@ -1970,6 +1970,7 @@ static unsigned int GetBlockScriptFlags(const CBlockIndex* pindex, const Consens
     // deployment is defined).
     if (flags & SCRIPT_VERIFY_P2SH && IsScriptWitnessEnabled(consensusparams)) {
         flags |= SCRIPT_VERIFY_WITNESS;
+        flags |= SCRIPT_VERIFY_CLEANSTACK;
     }
 
     // Start enforcing the DERSIG (BIP66) rule
