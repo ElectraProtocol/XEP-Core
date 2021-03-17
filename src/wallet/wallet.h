@@ -78,7 +78,7 @@ static const CAmount DEFAULT_MAX_AVOIDPARTIALSPEND_FEE = 0;
 //! discourage APS fee higher than this amount
 constexpr CAmount HIGH_APS_FEE{COIN / 100}; // 10 * DEFAULT_TRANSACTION_MINFEE
 //! minimum recommended increment for BIP 125 replacement txs
-static const CAmount WALLET_INCREMENTAL_RELAY_FEE = 500000; // 5 * DEFAULT_TRANSACTION_MINFEE
+static const CAmount WALLET_INCREMENTAL_RELAY_FEE = 5000; // would be 5 * DEFAULT_TRANSACTION_MINFEE but left at default value
 //! Default for -spendzeroconfchange
 static const bool DEFAULT_SPEND_ZEROCONF_CHANGE = true;
 //! Default for -walletrejectlongchains
