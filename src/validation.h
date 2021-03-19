@@ -80,6 +80,8 @@ static const bool DEFAULT_PERSIST_MEMPOOL = true;
 static const bool DEFAULT_FEEFILTER = true;
 /** Default for -stopatheight */
 static const int DEFAULT_STOPATHEIGHT = 0;
+/** Default for -maxreorgdepth */
+static const int DEFAULT_MAX_REORG_DEPTH = 1080; // Number of blocks in the past day
 /** Block files containing a block-height within MIN_BLOCKS_TO_KEEP of ::ChainActive().Tip() will not be pruned. */
 static const unsigned int MIN_BLOCKS_TO_KEEP = 2160; // Number of blocks in the past two days
 static const signed int DEFAULT_CHECKBLOCKS = 45; // Number of blocks in the past hour
