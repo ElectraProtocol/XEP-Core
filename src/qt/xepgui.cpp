@@ -869,7 +869,7 @@ void XEPGUI::showDebugWindowActivateConsole()
 
 void XEPGUI::showHelpMessageClicked()
 {
-    helpMessageDialog->show();
+    GUIUtil::bringToFront(helpMessageDialog);
 }
 
 #ifdef ENABLE_WALLET
