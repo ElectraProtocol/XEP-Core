@@ -1,20 +1,34 @@
-XEP Core integration/staging tree
-=====================================
-
-https://bitcoincore.org
-
 What is XEP?
-----------------
+============
 
-XEP is an experimental digital currency that enables instant payments to
-anyone, anywhere in the world. XEP uses peer-to-peer technology to operate
-with no central authority: managing transactions and issuing money are carried
-out collectively by the network. XEP Core is the name of open source
-software which enables the use of this currency.
+The Electra Protocol has been developed with invaluable features in mind to allow merchants, customers, and casual users to incorporate Electra Protocol’s global payment
+system into their everyday lives. Since the beginning, Electra has kept its users at the forefront of Project decisions throughout the development process, intending to
+transform how the world views payments through cryptocurrency and blockchain technologies.
 
 For more information, as well as an immediately usable, binary version of
-the XEP Core software, see https://bitcoincore.org/en/download/, or read the
-[original whitepaper](https://bitcoincore.org/xep.pdf).
+the XEP Core software, see https://www.electraprotocol.com/, or read the
+[whitepaper](https://www.electraprotocol.com/whitepaper/).
+
+<table>
+<tr> <td>Ticker</td><td>XEP</td></tr>
+<tr> <td>Algorithm</td><td>SHA-256</td></tr>
+<tr> <td>Consensus</td><td>Proof-of-Stake 3.0e</td></tr>
+<tr> <td>Circulating supply</td><td>https://electraprotocol.network/</td></tr>
+<tr> <td>Block Time</td><td>80 Seconds</td></tr>
+<tr> <td>Block Size</td><td>10 MB (Dynamic)</td></tr>
+<tr> <td>Staking Reward</td><td>3% yearly</td></tr>
+<tr> <td>Transactions Per Second</td><td>up to 1600</td></tr>
+<tr> <td>Retarget</td><td>Every Block</td></tr>
+<tr> <td>Coin Maturation Time</td><td>12 Hours & 600 confirmations</td></tr>
+<tr> <td>Max Coin Age</td><td>30 Days</td></tr>
+<tr> <td>Electronic Payment</td><td>ElectraPay</td></tr>
+<tr> <td>SegWit</td><td>Native</td></tr>
+<tr> <td>Lightning Network</td><td>Native</td></tr>
+<tr> <td>Taproot</td><td>Native</td></tr>
+<tr> <td>Atomic Swap</td><td>Yes</td></tr>
+<tr> <td>Premine</td><td>3B*</td></tr>
+</table>
+* 1.5B the first year, then 0.5 each subsequent years. (This is the maximum amount and can be burned eventually.)
 
 License
 -------
@@ -26,55 +40,5 @@ Development Process
 -------------------
 
 The `master` branch is regularly built (see `doc/build-*.md` for instructions) and tested, but it is not guaranteed to be
-completely stable. [Tags](https://github.com/bitcoin/bitcoin/tags) are created
+completely stable. [Tags](https://github.com/ElectraProtocol/XEP-Core/tags) are created
 regularly from release branches to indicate new official, stable release versions of XEP Core.
-
-The https://github.com/xep-core/gui repository is used exclusively for the
-development of the GUI. Its master branch is identical in all monotree
-repositories. Release branches and tags do not exist, so please do not fork
-that repository unless it is for development reasons.
-
-The contribution workflow is described in [CONTRIBUTING.md](CONTRIBUTING.md)
-and useful hints for developers can be found in [doc/developer-notes.md](doc/developer-notes.md).
-
-Testing
--------
-
-Testing and code review is the bottleneck for development; we get more pull
-requests than we can review and test on short notice. Please be patient and help out by testing
-other people's pull requests, and remember this is a security-critical project where any mistake might cost people
-lots of money.
-
-### Automated Testing
-
-Developers are strongly encouraged to write [unit tests](src/test/README.md) for new code, and to
-submit new unit tests for old code. Unit tests can be compiled and run
-(assuming they weren't disabled in configure) with: `make check`. Further details on running
-and extending unit tests can be found in [/src/test/README.md](/src/test/README.md).
-
-There are also [regression and integration tests](/test), written
-in Python, that are run automatically on the build server.
-These tests can be run (if the [test dependencies](/test) are installed) with: `test/functional/test_runner.py`
-
-The Travis CI system makes sure that every pull request is built for Windows, Linux, and macOS, and that unit/sanity tests are run automatically.
-
-### Manual Quality Assurance (QA) Testing
-
-Changes should be tested by somebody other than the developer who wrote the
-code. This is especially important for large or high-risk changes. It is useful
-to add a test plan to the pull request description if testing the changes is
-not straightforward.
-
-Translations
-------------
-
-Changes to translations as well as new translations can be submitted to
-[XEP Core's Transifex page](https://www.transifex.com/xep/xep/).
-
-Translations are periodically pulled from Transifex and merged into the git repository. See the
-[translation process](doc/translation_process.md) for details on how this works.
-
-**Important**: We do not accept translation changes as GitHub pull requests because the next
-pull from Transifex would automatically overwrite them again.
-
-Translators should also subscribe to the [mailing list](https://groups.google.com/forum/#!forum/xep-translators).
