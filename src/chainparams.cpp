@@ -128,8 +128,8 @@ public:
         consensus.mTreasuryPayees.emplace(CScript() << OP_0 << ParseHex("978a5064cd1fdf8c2510fe3fcbd65eaa5e98b32d"), 100); // 10% (full reward) for ep1qj799qexdrl0ccfgslcluh4j74f0f3vedatcv0k
         consensus.nTreasuryRewardPercentage = 10; // 10% of block reward goes to treasury
 
-        consensus.nMinimumChainWork = uint256S("0x00000000000000000000000000000000000000000000000035a7e986160b3cac");
-        consensus.defaultAssumeValid = uint256S("0x505286a87781aabbb6cfc7a9b735ffacd8ce73bc06ed17dae546cafe4ca3e7a3"); // 50000
+        consensus.nMinimumChainWork = uint256S("0x000000000000000000000000000000000000000000000215ca7cae71daa2ff94");
+        consensus.defaultAssumeValid = uint256S("0x88e536f2f4dad78b2177694d3b269f2145a5087d677f393a9980a300f746b6bf"); // 100000
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -191,14 +191,15 @@ public:
             {
                 { 0, uint256S("000000954c02f260a6db02c712557adcb5a7a8a0a9acfd3d3c2b3a427376c56f")},
                 { 50000, uint256S("505286a87781aabbb6cfc7a9b735ffacd8ce73bc06ed17dae546cafe4ca3e7a3")},
+                { 100000, uint256S("88e536f2f4dad78b2177694d3b269f2145a5087d677f393a9980a300f746b6bf")},
             }
         };
 
         chainTxData = ChainTxData{
-            // Data from RPC: getchaintxstats 30720 0000000000000000000b9d2ec5a352ecba0592946514a92f14319dc2b367fc72
-            /* nTime    */ 0,
-            /* nTxCount */ 0,
-            /* dTxRate  */ 0,
+            // Data from RPC: getchaintxstats 30720 88e536f2f4dad78b2177694d3b269f2145a5087d677f393a9980a300f746b6bf
+            /* nTime    */ 1617010880,
+            /* nTxCount */ 203162,
+            /* dTxRate  */ 0.02554147704435542,
         };
     }
 };
