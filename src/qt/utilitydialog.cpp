@@ -14,6 +14,8 @@
 
 #include <clientversion.h>
 #include <init.h>
+#include <key_io.h>
+#include <script/standard.h>
 #include <util/message.h>
 #include <util/system.h>
 #include <util/strencodings.h>
@@ -189,7 +191,7 @@ void UpdateWalletDialog::gotReply()
             signature.remove(0, jsonEnd + 3).chop(1);
             response_data.remove(jsonEnd + 1, response_data.size() - 1);
 
-            const std::string signingAddr = "PRjSuuJNUTDjZHExtfWMEGCwd7oCtajwS8";
+            const std::string signingAddr = EncodeDestination(PKHash(uint160(ParseHex("4030a4b91118ba1cef4e8ec02f78196f8ff83eef")))); // PESag4Dpqxtwv9QW3UVVM95oPUEcjk9HJt
             if (MessageVerify(signingAddr, signature.toStdString(), response_data.toStdString()) == MessageVerificationResult::OK) {
                 const QJsonDocument jsonAnswer = QJsonDocument::fromJson(response_data);
                 if (jsonAnswer.isObject()) {
