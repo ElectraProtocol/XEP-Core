@@ -50,7 +50,6 @@
         <file alias="ml">locale/xep_ml.qm</file>
         <file alias="mn">locale/xep_mn.qm</file>
         <file alias="mr_IN">locale/xep_mr_IN.qm</file>
-        <file alias="ms">locale/xep_ms.qm</file>
         <file alias="my">locale/xep_my.qm</file>
         <file alias="nb">locale/xep_nb.qm</file>
         <file alias="ne">locale/xep_ne.qm</file>
