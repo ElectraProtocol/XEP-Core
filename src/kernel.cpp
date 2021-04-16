@@ -636,7 +636,7 @@ bool CheckProofOfStake(BlockValidationState& state, const CCoinsViewCache& view,
     {
         int nIn = 0;
         //const CTxOut& prevTxOut = txPrev->vout[tx->vin[nIn].prevout.n];
-        TransactionSignatureChecker checker(&(*tx), nIn, coin.out.nValue, PrecomputedTransactionData(*tx));
+        TransactionSignatureChecker checker(&(*tx), nIn, coin.out.nValue, &::ChainActive(), PrecomputedTransactionData(*tx));
         ScriptError serror = SCRIPT_ERR_OK;
 
         if (!VerifyScript(tx->vin[nIn].scriptSig, coin.out.scriptPubKey, &(tx->vin[nIn].scriptWitness), STANDARD_CONTEXTUAL_SCRIPT_VERIFY_FLAGS, checker, &serror))
