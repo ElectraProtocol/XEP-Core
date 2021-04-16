@@ -703,7 +703,7 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
     if (tx.HasWitness() && fRequireStandard && !IsWitnessStandard(tx, m_view))
         return state.Invalid(TxValidationResult::TX_WITNESS_MUTATED, "bad-witness-nonstandard");
 
-    int64_t nSigOpsCost = GetTransactionSigOpCost(tx, m_view, STANDARD_SCRIPT_VERIFY_FLAGS);
+    int64_t nSigOpsCost = GetTransactionSigOpCost(tx, m_view, STANDARD_NONCONTEXTUAL_SCRIPT_VERIFY_FLAGS);
 
     // nModifiedFees includes any fee deltas from PrioritiseTransaction
     nModifiedFees = nFees;
@@ -930,7 +930,7 @@ bool MemPoolAccept::PolicyScriptChecks(ATMPArgs& args, Workspace& ws, Precompute
 
     TxValidationState &state = args.m_state;
 
-    constexpr unsigned int scriptVerifyFlags = STANDARD_SCRIPT_VERIFY_FLAGS;
+    constexpr unsigned int scriptVerifyFlags = STANDARD_CONTEXTUAL_SCRIPT_VERIFY_FLAGS;
 
     // Check input scripts and signatures.
     // This is done last to help prevent CPU exhaustion denial-of-service attacks.
@@ -1629,7 +1629,7 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState &state, const C
             if (check.GetScriptError() == SCRIPT_ERR_NOT_FINAL) {
                 return state.Invalid(TxValidationResult::TX_PREMATURE_SPEND, strprintf("non-final (%s)", ScriptErrorString(check.GetScriptError())));
             }
-            if (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) {
+            if (flags & STANDARD_CONTEXTUAL_NOT_MANDATORY_VERIFY_FLAGS) {
                 // Check whether the failure was caused by a
                 // non-mandatory script verification check, such as
                 // non-standard DER encodings or non-null dummy
@@ -1639,7 +1639,7 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState &state, const C
                 // non-upgraded nodes by banning CONSENSUS-failing
                 // data providers.
                 CScriptCheck check2(txdata.m_spent_outputs[i], tx, i,
-                        flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS, cacheSigStore, &txdata);
+                        flags & ~STANDARD_CONTEXTUAL_NOT_MANDATORY_VERIFY_FLAGS, cacheSigStore, &txdata);
                 if (check2())
                     return state.Invalid(TxValidationResult::TX_NOT_STANDARD, strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(check.GetScriptError())));
             }

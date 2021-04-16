@@ -526,11 +526,11 @@ BOOST_AUTO_TEST_CASE(test_witness)
     CheckWithFlag(output1, input1, 0, true);
     CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true);
     CheckWithFlag(output1, input1, SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
+    CheckWithFlag(output1, input1, STANDARD_NONCONTEXTUAL_SCRIPT_VERIFY_FLAGS, true);
     CheckWithFlag(output1, input2, 0, false);
     CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, false);
     CheckWithFlag(output1, input2, SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_P2SH, false);
-    CheckWithFlag(output1, input2, STANDARD_SCRIPT_VERIFY_FLAGS, false);
+    CheckWithFlag(output1, input2, STANDARD_NONCONTEXTUAL_SCRIPT_VERIFY_FLAGS, false);
 
     // P2SH pay-to-compressed-pubkey.
     CreateCreditAndSpend(keystore, GetScriptForDestination(ScriptHash(scriptPubkey1)), output1, input1);
@@ -539,11 +539,11 @@ BOOST_AUTO_TEST_CASE(test_witness)
     CheckWithFlag(output1, input1, 0, true);
     CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true);
     CheckWithFlag(output1, input1, SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
+    CheckWithFlag(output1, input1, STANDARD_NONCONTEXTUAL_SCRIPT_VERIFY_FLAGS, true);
     CheckWithFlag(output1, input2, 0, true);
     CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, false);
     CheckWithFlag(output1, input2, SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_P2SH, false);
-    CheckWithFlag(output1, input2, STANDARD_SCRIPT_VERIFY_FLAGS, false);
+    CheckWithFlag(output1, input2, STANDARD_NONCONTEXTUAL_SCRIPT_VERIFY_FLAGS, false);
 
     // Witness pay-to-compressed-pubkey (v0).
     CreateCreditAndSpend(keystore, destination_script_1, output1, input1);
@@ -551,11 +551,11 @@ BOOST_AUTO_TEST_CASE(test_witness)
     CheckWithFlag(output1, input1, 0, true);
     CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true);
     CheckWithFlag(output1, input1, SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
+    CheckWithFlag(output1, input1, STANDARD_NONCONTEXTUAL_SCRIPT_VERIFY_FLAGS, true);
     CheckWithFlag(output1, input2, 0, true);
     CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, true);
     CheckWithFlag(output1, input2, SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_P2SH, false);
-    CheckWithFlag(output1, input2, STANDARD_SCRIPT_VERIFY_FLAGS, false);
+    CheckWithFlag(output1, input2, STANDARD_NONCONTEXTUAL_SCRIPT_VERIFY_FLAGS, false);
 
     // P2SH witness pay-to-compressed-pubkey (v0).
     CreateCreditAndSpend(keystore, GetScriptForDestination(ScriptHash(destination_script_1)), output1, input1);
@@ -564,11 +564,11 @@ BOOST_AUTO_TEST_CASE(test_witness)
     CheckWithFlag(output1, input1, 0, true);
     CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true);
     CheckWithFlag(output1, input1, SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
+    CheckWithFlag(output1, input1, STANDARD_NONCONTEXTUAL_SCRIPT_VERIFY_FLAGS, true);
     CheckWithFlag(output1, input2, 0, true);
     CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, true);
     CheckWithFlag(output1, input2, SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_P2SH, false);
-    CheckWithFlag(output1, input2, STANDARD_SCRIPT_VERIFY_FLAGS, false);
+    CheckWithFlag(output1, input2, STANDARD_NONCONTEXTUAL_SCRIPT_VERIFY_FLAGS, false);
 
     // Normal pay-to-uncompressed-pubkey.
     CreateCreditAndSpend(keystore, scriptPubkey1L, output1, input1);
@@ -576,11 +576,11 @@ BOOST_AUTO_TEST_CASE(test_witness)
     CheckWithFlag(output1, input1, 0, true);
     CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true);
     CheckWithFlag(output1, input1, SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
+    CheckWithFlag(output1, input1, STANDARD_NONCONTEXTUAL_SCRIPT_VERIFY_FLAGS, true);
     CheckWithFlag(output1, input2, 0, false);
     CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, false);
     CheckWithFlag(output1, input2, SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_P2SH, false);
-    CheckWithFlag(output1, input2, STANDARD_SCRIPT_VERIFY_FLAGS, false);
+    CheckWithFlag(output1, input2, STANDARD_NONCONTEXTUAL_SCRIPT_VERIFY_FLAGS, false);
 
     // P2SH pay-to-uncompressed-pubkey.
     CreateCreditAndSpend(keystore, GetScriptForDestination(ScriptHash(scriptPubkey1L)), output1, input1);
@@ -589,11 +589,11 @@ BOOST_AUTO_TEST_CASE(test_witness)
     CheckWithFlag(output1, input1, 0, true);
     CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true);
     CheckWithFlag(output1, input1, SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
+    CheckWithFlag(output1, input1, STANDARD_NONCONTEXTUAL_SCRIPT_VERIFY_FLAGS, true);
     CheckWithFlag(output1, input2, 0, true);
     CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, false);
     CheckWithFlag(output1, input2, SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_P2SH, false);
-    CheckWithFlag(output1, input2, STANDARD_SCRIPT_VERIFY_FLAGS, false);
+    CheckWithFlag(output1, input2, STANDARD_NONCONTEXTUAL_SCRIPT_VERIFY_FLAGS, false);
 
     // Signing disabled for witness pay-to-uncompressed-pubkey (v1).
     CreateCreditAndSpend(keystore, destination_script_1L, output1, input1, false);
@@ -610,7 +610,7 @@ BOOST_AUTO_TEST_CASE(test_witness)
     CheckWithFlag(output2, input2, 0, false);
     BOOST_CHECK(*output1 == *output2);
     UpdateInput(input1.vin[0], CombineSignatures(input1, input2, output1));
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
+    CheckWithFlag(output1, input1, STANDARD_NONCONTEXTUAL_SCRIPT_VERIFY_FLAGS, true);
 
     // P2SH 2-of-2 multisig
     CreateCreditAndSpend(keystore, GetScriptForDestination(ScriptHash(scriptMulti)), output1, input1, false);
@@ -622,7 +622,7 @@ BOOST_AUTO_TEST_CASE(test_witness)
     BOOST_CHECK(*output1 == *output2);
     UpdateInput(input1.vin[0], CombineSignatures(input1, input2, output1));
     CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
+    CheckWithFlag(output1, input1, STANDARD_NONCONTEXTUAL_SCRIPT_VERIFY_FLAGS, true);
 
     // Witness 2-of-2 multisig
     CreateCreditAndSpend(keystore, destination_script_multi, output1, input1, false);
@@ -634,7 +634,7 @@ BOOST_AUTO_TEST_CASE(test_witness)
     BOOST_CHECK(*output1 == *output2);
     UpdateInput(input1.vin[0], CombineSignatures(input1, input2, output1));
     CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
+    CheckWithFlag(output1, input1, STANDARD_NONCONTEXTUAL_SCRIPT_VERIFY_FLAGS, true);
 
     // P2SH witness 2-of-2 multisig
     CreateCreditAndSpend(keystore, GetScriptForDestination(ScriptHash(destination_script_multi)), output1, input1, false);
@@ -646,7 +646,7 @@ BOOST_AUTO_TEST_CASE(test_witness)
     BOOST_CHECK(*output1 == *output2);
     UpdateInput(input1.vin[0], CombineSignatures(input1, input2, output1));
     CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
+    CheckWithFlag(output1, input1, STANDARD_NONCONTEXTUAL_SCRIPT_VERIFY_FLAGS, true);
 }
 
 BOOST_AUTO_TEST_CASE(test_IsStandard)

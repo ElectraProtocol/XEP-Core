@@ -639,7 +639,7 @@ bool CheckProofOfStake(BlockValidationState& state, const CCoinsViewCache& view,
         TransactionSignatureChecker checker(&(*tx), nIn, coin.out.nValue, PrecomputedTransactionData(*tx));
         ScriptError serror = SCRIPT_ERR_OK;
 
-        if (!VerifyScript(tx->vin[nIn].scriptSig, coin.out.scriptPubKey, &(tx->vin[nIn].scriptWitness), STANDARD_SCRIPT_VERIFY_FLAGS, checker, &serror))
+        if (!VerifyScript(tx->vin[nIn].scriptSig, coin.out.scriptPubKey, &(tx->vin[nIn].scriptWitness), STANDARD_CONTEXTUAL_SCRIPT_VERIFY_FLAGS, checker, &serror))
             return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "invalid-pos-script", strprintf("%s: VerifyScript failed on coinstake %s, %s", __func__, tx->GetHash().ToString(), ScriptErrorString(serror)));
     }
 

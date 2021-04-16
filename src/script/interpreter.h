@@ -141,6 +141,8 @@ enum
     SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_PUBKEYTYPE = (1U << 20),
 };
 
+static constexpr unsigned int CONTEXTUAL_SCRIPT_VERIFY_FLAGS = 0;
+
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError* serror);
 
 struct PrecomputedTransactionData
