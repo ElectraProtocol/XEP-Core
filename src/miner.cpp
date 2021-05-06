@@ -596,7 +596,8 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                 if (gArgs.GetBoolArg("-debug", false) && gArgs.GetBoolArg("-printcoinstake", false))
                     LogPrintf("%s : parsed kernel type=%s\n", __func__, GetTxnOutputType(whichType));
 
-                if (whichType == TxoutType::PUBKEY || whichType == TxoutType::PUBKEYHASH || whichType == TxoutType::WITNESS_V0_KEYHASH || whichType == TxoutType::SCRIPTHASH || whichType == TxoutType::WITNESS_V0_SCRIPTHASH) { // we support p2pkh, p2wpkh, p2sh-p2wpkh, and p2sh/p2wsh-multisig inputs
+                if (whichType == TxoutType::PUBKEY || whichType == TxoutType::PUBKEYHASH || whichType == TxoutType::PUBKEYHASH_REPLAY || whichType == TxoutType::WITNESS_V0_KEYHASH || whichType == TxoutType::SCRIPTHASH ||
+                    whichType == TxoutType::WITNESS_V0_SCRIPTHASH) { // we support p2pkh, p2wpkh, p2sh-p2wpkh, and p2sh/p2wsh-multisig inputs
                     const bool fNewStakingCodeActive = nHeight >= consensusParams.nMandatoryUpgradeBlock;
                     if (whichType == TxoutType::SCRIPTHASH || whichType == TxoutType::WITNESS_V0_SCRIPTHASH) { // a p2sh/p2wsh input could be many things, but we only support p2sh-p2wpkh and multisig for now
                         CScript subscript;
@@ -633,7 +634,7 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                             LogPrintf("%s : failed to get new destination for coinstake (%s)\n", __func__, error);
                             scriptPubKeyOut = scriptPubKeyKernel;
                         }
-                    } else if (whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_DATA) { // try to create a new destination for p2sh/p2wsh-multisig inputs
+                    } else if (whichType == TxoutType::PUBKEYHASH_REPLAY || whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_DATA) { // try to create a new destination for p2sh/p2wsh-multisig inputs
                         OutputType output_type = OutputType::BECH32;
                         CTxDestination dest;
                         std::string error;
