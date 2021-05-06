@@ -50,6 +50,7 @@ std::string GetTxnOutputType(TxoutType t)
     case TxoutType::NONSTANDARD: return "nonstandard";
     case TxoutType::PUBKEY: return "pubkey";
     case TxoutType::PUBKEYHASH: return "pubkeyhash";
+    case TxoutType::PUBKEYHASH_REPLAY: return "pubkeyhash_replay";
     case TxoutType::SCRIPTHASH: return "scripthash";
     case TxoutType::MULTISIG: return "multisig";
     case TxoutType::MULTISIG_DATA: return "multisig_data";
@@ -113,6 +114,50 @@ static bool IsMinimalPush(const valtype& data, opcodetype opcode) {
         // Must have used OP_PUSHDATA2.
         return opcode == OP_PUSHDATA2;
     }
+    return true;
+}
+
+static bool IsMinimallyEncoded(const valtype& vch)
+{
+    if (vch.size() > 0) {
+        // Check that the number is encoded with the minimum possible
+        // number of bytes.
+        //
+        // If the most-significant-byte - excluding the sign bit - is zero
+        // then we're not minimal. Note how this test also rejects the
+        // negative-zero encoding, 0x80.
+        if ((vch.back() & 0x7f) == 0) {
+            // One exception: if there's more than one byte and the most
+            // significant bit of the second-most-significant-byte is set
+            // it would conflict with the sign bit. An example of this case
+            // is +-255, which encode to 0xff00 and 0xff80 respectively.
+            // (big-endian).
+            if (vch.size() <= 1 || (vch[vch.size() - 2] & 0x80) == 0) {
+                return false;
+            }
+        }
+        return true;
+    } else
+        return false;
+}
+
+static bool MatchPayToPubkeyHashReplay(const CScript& script, valtype& pubkeyhash)
+{
+    const unsigned int scriptSize = script.size();
+    if (scriptSize < 29 || scriptSize > 65 || script[0] != OP_DUP || script[1] != OP_HASH160 || script[2] != 20 || script[23] != OP_EQUALVERIFY ||
+        script[24] != OP_CHECKSIG || script[scriptSize - 2] != OP_CHECKBLOCKATHEIGHTVERIFY || script.back() != OP_2DROP) return false;
+
+    opcodetype opcode;
+    valtype data;
+    CScript::const_iterator it = script.begin() + 25;
+
+    if (!script.GetOp(it, opcode, data) || data.size() > 32 /* uint256 size */) return false;
+    // Optionally ensure leading zeroes are trimmed from the block hash
+    if (!IsSmallInteger(opcode) && (!IsMinimalPush(data, opcode) /*|| data.size() == 0 || (data.back() & 0xff) == 0*/)) return false;
+    if (!script.GetOp(it, opcode, data) || data.size() > 4 /* int32_t size */) return false;
+    if (!IsSmallInteger(opcode) && (!IsMinimalPush(data, opcode) || !IsMinimallyEncoded(data))) return false;
+
+    pubkeyhash = valtype(script.begin() + 3, script.begin() + 23);
     return true;
 }
 
@@ -212,6 +257,11 @@ TxoutType Solver(const CScript& scriptPubKey, std::vector<std::vector<unsigned c
         return TxoutType::PUBKEYHASH;
     }
 
+    if (MatchPayToPubkeyHashReplay(scriptPubKey, data)) {
+        vSolutionsRet.push_back(std::move(data));
+        return TxoutType::PUBKEYHASH_REPLAY;
+    }
+
     unsigned int required;
     std::vector<std::vector<unsigned char>> keys;
     if (MatchMultisig(scriptPubKey, required, keys)) {
@@ -246,7 +296,7 @@ bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
         addressRet = PKHash(pubKey);
         return true;
     }
-    else if (whichType == TxoutType::PUBKEYHASH)
+    else if (whichType == TxoutType::PUBKEYHASH || whichType == TxoutType::PUBKEYHASH_REPLAY)
     {
         addressRet = PKHash(uint160(vSolutions[0]));
         return true;

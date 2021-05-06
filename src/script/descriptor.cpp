@@ -994,7 +994,7 @@ std::unique_ptr<DescriptorImpl> InferScript(const CScript& script, ParseScriptCo
             return MakeUnique<PKDescriptor>(InferPubkey(pubkey, ctx, provider));
         }
     }
-    if (txntype == TxoutType::PUBKEYHASH) {
+    if (txntype == TxoutType::PUBKEYHASH || txntype == TxoutType::PUBKEYHASH_REPLAY) {
         uint160 hash(data[0]);
         CKeyID keyid(hash);
         CPubKey pubkey;
