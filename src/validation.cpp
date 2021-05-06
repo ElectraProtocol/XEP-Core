@@ -1626,6 +1626,9 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState &state, const C
             pvChecks->push_back(CScriptCheck());
             check.swap(pvChecks->back());
         } else if (!check()) {
+            if (check.GetScriptError() == SCRIPT_ERR_NOT_FINAL) {
+                return state.Invalid(TxValidationResult::TX_PREMATURE_SPEND, strprintf("non-final (%s)", ScriptErrorString(check.GetScriptError())));
+            }
             if (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) {
                 // Check whether the failure was caused by a
                 // non-mandatory script verification check, such as
