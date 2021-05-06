@@ -90,6 +90,32 @@ static constexpr bool IsSmallInteger(opcodetype opcode)
     return opcode >= OP_1 && opcode <= OP_16;
 }
 
+static bool IsMinimalPush(const valtype& data, opcodetype opcode) {
+    // Excludes OP_1NEGATE, OP_1-16 since they are by definition minimal
+    if (0 > opcode || opcode > OP_PUSHDATA4) {
+        return false;
+    } else if (data.size() == 0) {
+        // Should have used OP_0.
+        return opcode == OP_0;
+    } else if (data.size() == 1 && data[0] >= 1 && data[0] <= 16) {
+        // Should have used OP_1 .. OP_16.
+        return false;
+    } else if (data.size() == 1 && data[0] == 0x81) {
+        // Should have used OP_1NEGATE.
+        return false;
+    } else if (data.size() <= 75) {
+        // Must have used a direct push (opcode indicating number of bytes pushed + those bytes).
+        return opcode == data.size();
+    } else if (data.size() <= 255) {
+        // Must have used OP_PUSHDATA.
+        return opcode == OP_PUSHDATA1;
+    } else if (data.size() <= 65535) {
+        // Must have used OP_PUSHDATA2.
+        return opcode == OP_PUSHDATA2;
+    }
+    return true;
+}
+
 static bool MatchMultisig(const CScript& script, unsigned int& required, std::vector<valtype>& pubkeys)
 {
     opcodetype opcode;
@@ -115,7 +141,7 @@ static bool MatchMultisigData(const CScript& script, unsigned int& required, std
     CScript::const_iterator it = script.begin();
     if (script.size() < 1 || script.back() != OP_CHECKMULTISIG) return false;
 
-    if (!script.GetOp(it, opcode, data) || data.size() < 1 || data.size() > MAX_MULTISIG_DATA_OP_DROP_SIZE) return false;
+    if (!script.GetOp(it, opcode, data) || data.size() < 1 || data.size() > MAX_MULTISIG_DATA_OP_DROP_SIZE || !IsMinimalPush(data, opcode)) return false;
     if (!script.GetOp(it, opcode, data) || opcode != OP_DROP) return false;
 
     if (!script.GetOp(it, opcode, data) || !IsSmallInteger(opcode)) return false;
