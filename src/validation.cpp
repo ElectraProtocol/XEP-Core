@@ -2001,6 +2001,11 @@ static unsigned int GetBlockScriptFlags(const CBlockIndex* pindex, const Consens
         flags |= SCRIPT_VERIFY_NULLDUMMY;
     }
 
+    // Start enforcing BIP115 (CHECKBLOCKATHEIGHTVERIFY)
+    if (pindex->nHeight >= 1) {
+        flags |= SCRIPT_VERIFY_CHECKBLOCKATHEIGHTVERIFY;
+    }
+
     return flags;
 }
 

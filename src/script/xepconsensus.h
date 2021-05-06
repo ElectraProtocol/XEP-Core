@@ -55,6 +55,7 @@ enum
     xepconsensus_SCRIPT_FLAGS_VERIFY_CHECKLOCKTIMEVERIFY = (1U << 9), // enable CHECKLOCKTIMEVERIFY (BIP65)
     xepconsensus_SCRIPT_FLAGS_VERIFY_CHECKSEQUENCEVERIFY = (1U << 10), // enable CHECKSEQUENCEVERIFY (BIP112)
     xepconsensus_SCRIPT_FLAGS_VERIFY_WITNESS             = (1U << 11), // enable WITNESS (BIP141)
+    // NOTE: Do NOT add CHECKBLOCKATHEIGHTVERIFY here without updating verify_script to pass context!
     xepconsensus_SCRIPT_FLAGS_VERIFY_ALL                 = xepconsensus_SCRIPT_FLAGS_VERIFY_P2SH | xepconsensus_SCRIPT_FLAGS_VERIFY_DERSIG |
                                                                xepconsensus_SCRIPT_FLAGS_VERIFY_NULLDUMMY | xepconsensus_SCRIPT_FLAGS_VERIFY_CHECKLOCKTIMEVERIFY |
                                                                xepconsensus_SCRIPT_FLAGS_VERIFY_CHECKSEQUENCEVERIFY | xepconsensus_SCRIPT_FLAGS_VERIFY_WITNESS
