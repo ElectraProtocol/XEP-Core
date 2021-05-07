@@ -1653,10 +1653,20 @@ bool DescriptorScriptPubKeyMan::GetNewDestination(const OutputType type, CTxDest
     }
 }
 
+static CScript StripReplayProtectionData(CScript newScript)
+{
+    const unsigned int scriptSize = newScript.size();
+    if (scriptSize >= 29 && scriptSize <= 65 && newScript[0] == OP_DUP && newScript[1] == OP_HASH160 && newScript[2] == 20 && newScript[23] == OP_EQUALVERIFY &&
+        newScript[24] == OP_CHECKSIG && newScript[scriptSize - 2] == OP_CHECKBLOCKATHEIGHTVERIFY && newScript.back() == OP_2DROP) { // TxoutType::PUBKEYHASH_REPLAY
+        newScript = CScript(newScript.begin(), newScript.begin() + 25);
+    }
+    return newScript;
+}
+
 isminetype DescriptorScriptPubKeyMan::IsMine(const CScript& script) const
 {
     LOCK(cs_desc_man);
-    if (m_map_script_pub_keys.count(script) > 0) {
+    if (m_map_script_pub_keys.count(StripReplayProtectionData(script)) > 0) {
         return ISMINE_SPENDABLE;
     }
     return ISMINE_NO;
@@ -1845,7 +1855,7 @@ void DescriptorScriptPubKeyMan::MarkUnusedAddresses(const CScript& script)
 {
     LOCK(cs_desc_man);
     if (IsMine(script)) {
-        int32_t index = m_map_script_pub_keys[script];
+        int32_t index = m_map_script_pub_keys[StripReplayProtectionData(script)];
         if (index >= m_wallet_descriptor.next_index) {
             WalletLogPrintf("%s: Detected a used keypool item at index %d, mark all keypool items up to this item as used\n", __func__, index);
             m_wallet_descriptor.next_index = index + 1;
@@ -2010,7 +2020,7 @@ std::unique_ptr<FlatSigningProvider> DescriptorScriptPubKeyMan::GetSigningProvid
     LOCK(cs_desc_man);
 
     // Find the index of the script
-    auto it = m_map_script_pub_keys.find(script);
+    auto it = m_map_script_pub_keys.find(StripReplayProtectionData(script));
     if (it == m_map_script_pub_keys.end()) {
         return nullptr;
     }
