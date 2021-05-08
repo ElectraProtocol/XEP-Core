@@ -604,8 +604,7 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                         std::unique_ptr<SigningProvider> provider = pwallet->GetSolvingProvider(scriptPubKeyKernel);
                         uint160 hash;
                         if (whichType == TxoutType::WITNESS_V0_SCRIPTHASH) {
-                            CRIPEMD160 hasher;
-                            hasher.Write(&vSolutions[0][0], 32).Finalize(hash.begin());
+                            CRIPEMD160().Write(&vSolutions[0][0], 32).Finalize(hash.begin());
                         } else // whichType == TxoutType::SCRIPTHASH
                             hash = uint160(vSolutions[0]);
                         if (provider && provider->GetCScript(CScriptID(hash), subscript)) { // extract the redeem script
