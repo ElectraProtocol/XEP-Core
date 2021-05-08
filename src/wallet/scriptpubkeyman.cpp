@@ -1660,6 +1660,9 @@ static CScript StripReplayProtectionData(CScript newScript)
     if (scriptSize >= 29 && scriptSize <= 65 && newScript[0] == OP_DUP && newScript[1] == OP_HASH160 && newScript[2] == 20 && newScript[23] == OP_EQUALVERIFY &&
         newScript[24] == OP_CHECKSIG && newScript[scriptSize - 2] == OP_CHECKBLOCKATHEIGHTVERIFY && newScript.back() == OP_2DROP) { // TxoutType::PUBKEYHASH_REPLAY
         newScript = CScript(newScript.begin(), newScript.begin() + 25);
+    } else if (scriptSize >= 27 && scriptSize <= 63 && newScript[0] == OP_HASH160 && newScript[1] == 20 && newScript[22] == OP_EQUAL &&
+               newScript[scriptSize - 2] == OP_CHECKBLOCKATHEIGHTVERIFY && newScript.back() == OP_2DROP) { // TxoutType::SCRIPTHASH_REPLAY
+        newScript = CScript(newScript.begin(), newScript.begin() + 23);
     }
     return newScript;
 }
