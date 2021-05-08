@@ -4655,7 +4655,7 @@ bool CWallet::GetBlockSigningPubKey(const CBlock& block, CPubKey& pubkey, bool& 
         std::unique_ptr<SigningProvider> provider = GetSolvingProvider(scriptPubKey);
         if (!provider || !provider->GetPubKey(CKeyID(uint160(vSolutions[0])), pubkey))
             return false;
-    } else if (whichType == TxoutType::SCRIPTHASH || whichType == TxoutType::WITNESS_V0_SCRIPTHASH) {
+    } else if (whichType == TxoutType::SCRIPTHASH || whichType == TxoutType::SCRIPTHASH_REPLAY || whichType == TxoutType::WITNESS_V0_SCRIPTHASH) {
         CScript subscript;
         std::unique_ptr<SigningProvider> provider = GetSolvingProvider(scriptPubKey);
         uint160 hash;
