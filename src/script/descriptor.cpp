@@ -1018,7 +1018,7 @@ std::unique_ptr<DescriptorImpl> InferScript(const CScript& script, ParseScriptCo
         }
         return MakeUnique<MultisigDescriptor>((int)data[0][0], std::move(providers));
     }
-    if (txntype == TxoutType::SCRIPTHASH && ctx == ParseScriptContext::TOP) {
+    if ((txntype == TxoutType::SCRIPTHASH || txntype == TxoutType::SCRIPTHASH_REPLAY) && ctx == ParseScriptContext::TOP) {
         uint160 hash(data[0]);
         CScriptID scriptid(hash);
         CScript subscript;

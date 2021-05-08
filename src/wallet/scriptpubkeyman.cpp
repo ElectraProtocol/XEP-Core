@@ -136,6 +136,7 @@ IsMineResult IsMineInner(const LegacyScriptPubKeyMan& keystore, const CScript& s
         }
         break;
     case TxoutType::SCRIPTHASH:
+    case TxoutType::SCRIPTHASH_REPLAY:
     {
         if (sigversion != IsMineSigVersion::TOP) {
             // P2SH inside P2WSH or P2SH is invalid.

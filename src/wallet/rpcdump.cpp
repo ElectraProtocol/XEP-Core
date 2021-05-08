@@ -889,7 +889,8 @@ static std::string RecurseImportData(const CScript& script, ImportData& import_d
         import_data.used_keys[id] = true;
         return "";
     }
-    case TxoutType::SCRIPTHASH: {
+    case TxoutType::SCRIPTHASH:
+    case TxoutType::SCRIPTHASH_REPLAY: {
         if (script_ctx == ScriptContext::P2SH) throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Trying to nest P2SH inside another P2SH");
         if (script_ctx == ScriptContext::WITNESS_V0) throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Trying to nest P2SH inside a P2WSH");
         CHECK_NONFATAL(script_ctx == ScriptContext::TOP);

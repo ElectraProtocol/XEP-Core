@@ -201,10 +201,18 @@ unsigned int CScript::GetSigOpCount(const CScript& scriptSig) const
 bool CScript::IsPayToScriptHash() const
 {
     // Extra-fast test for pay-to-script-hash CScripts:
-    return (this->size() == 23 &&
+    const unsigned int scriptSize = this->size();
+    return (scriptSize == 23 && // TxoutType::SCRIPTHASH
             (*this)[0] == OP_HASH160 &&
             (*this)[1] == 0x14 &&
-            (*this)[22] == OP_EQUAL);
+            (*this)[22] == OP_EQUAL) ||
+           (scriptSize >= 27 && // TxoutType::SCRIPTHASH_REPLAY
+            scriptSize <= 63 &&
+            (*this)[0] == OP_HASH160 &&
+            (*this)[1] == 0x14 &&
+            (*this)[22] == OP_EQUAL &&
+            (*this)[scriptSize - 2] == OP_CHECKBLOCKATHEIGHTVERIFY &&
+            this->back() == OP_2DROP);
 }
 
 bool CScript::IsPayToWitnessScriptHash() const
