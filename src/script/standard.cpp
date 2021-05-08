@@ -204,10 +204,7 @@ static bool MatchMultisigData(const CScript& script, unsigned int& required, std
     opcodetype opcode;
     valtype data;
     CScript::const_iterator it = script.begin();
-    if (script.size() < 1 || script.back() != OP_CHECKMULTISIG) return false;
-
-    if (!script.GetOp(it, opcode, data) || data.size() < 1 || data.size() > MAX_MULTISIG_DATA_OP_DROP_SIZE || !IsMinimalPush(data, opcode)) return false;
-    if (!script.GetOp(it, opcode, data) || opcode != OP_DROP) return false;
+    if (script.size() < 1 || script.back() != OP_DROP) return false;
 
     if (!script.GetOp(it, opcode, data) || !IsSmallInteger(opcode)) return false;
     required = CScript::DecodeOP_N(opcode);
@@ -217,6 +214,10 @@ static bool MatchMultisigData(const CScript& script, unsigned int& required, std
     if (!IsSmallInteger(opcode)) return false;
     unsigned int keys = CScript::DecodeOP_N(opcode);
     if (pubkeys.size() != keys || keys < required) return false;
+
+    if (!script.GetOp(it, opcode, data) || opcode != OP_CHECKMULTISIG) return false;
+    if (!script.GetOp(it, opcode, data) || data.size() < 1 || data.size() > MAX_MULTISIG_DATA_OP_DROP_SIZE || !IsMinimalPush(data, opcode)) return false;
+
     return (it + 1 == script.end());
 }
 
