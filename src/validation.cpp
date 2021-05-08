@@ -5754,7 +5754,8 @@ bool GetCoinAge(const CTransaction& tx, const CCoinsViewCache& view, unsigned in
 // peercoin: check block signature
 bool CheckBlockSignature(const CBlock& block)
 {
-    if (block.GetHash() == Params().GetConsensus().hashGenesisBlock)
+    const uint256& blockHash = block.GetHash();
+    if (blockHash == Params().GetConsensus().hashGenesisBlock)
         return block.vchBlockSig.empty();
 
     if (block.vchBlockSig.empty())
@@ -5812,5 +5813,6 @@ bool CheckBlockSignature(const CBlock& block)
     if (!pubkey.IsCompressed())
         return error("%s : invalid pubkey %s", __func__, HexStr(pubkey));
 
-    return pubkey.Verify(block.GetHash(), block.vchBlockSig);
+    CPubKey recoveredPubKey;
+    return (recoveredPubKey.RecoverCompact(blockHash, block.vchBlockSig) && recoveredPubKey == pubkey) || pubkey.Verify(blockHash, block.vchBlockSig);
 }

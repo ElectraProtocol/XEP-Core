@@ -602,7 +602,7 @@ SigningResult LegacyScriptPubKeyMan::SignBlock(CBlock& block, const CPubKey& pub
         return SigningResult::PRIVATE_KEY_NOT_AVAILABLE;
     }
 
-    if (key.Sign(block.GetHash(), block.vchBlockSig, 0)) {
+    if (key.Sign(block.GetHash(), block.vchBlockSig)) {
         return SigningResult::OK;
     }
     return SigningResult::SIGNING_FAILED;
@@ -2119,7 +2119,7 @@ SigningResult DescriptorScriptPubKeyMan::SignBlock(CBlock& block, const CPubKey&
         return SigningResult::PRIVATE_KEY_NOT_AVAILABLE;
     }
 
-    if (!key.Sign(block.GetHash(), block.vchBlockSig, 0)) {
+    if (!key.Sign(block.GetHash(), block.vchBlockSig)) {
         return SigningResult::SIGNING_FAILED;
     }
     return SigningResult::OK;
