@@ -99,6 +99,8 @@ IsMineResult IsMineInner(const LegacyScriptPubKeyMan& keystore, const CScript& s
     case TxoutType::WITNESS_V1_TAPROOT:
         break;
     case TxoutType::PUBKEY:
+    case TxoutType::PUBKEY_REPLAY:
+    case TxoutType::PUBKEY_DATA_REPLAY:
         keyID = CPubKey(vSolutions[0]).GetID();
         if (!PermitsUncompressed(sigversion) && vSolutions[0].size() != 33) {
             return IsMineResult::INVALID;
@@ -855,7 +857,8 @@ bool LegacyScriptPubKeyMan::HaveWatchOnly() const
 static bool ExtractPubKey(const CScript &dest, CPubKey& pubKeyOut)
 {
     std::vector<std::vector<unsigned char>> solutions;
-    return Solver(dest, solutions) == TxoutType::PUBKEY &&
+    TxoutType whichType = Solver(dest, solutions);
+    return (whichType == TxoutType::PUBKEY || whichType == TxoutType::PUBKEY_REPLAY || whichType == TxoutType::PUBKEY_DATA_REPLAY) &&
         (pubKeyOut = CPubKey(solutions[0])).IsFullyValid();
 }
 

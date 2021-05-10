@@ -597,12 +597,12 @@ static RPCHelpMan decodescript()
         r.pushKV("p2sh", EncodeDestination(ScriptHash(script)));
         // P2SH and witness programs cannot be wrapped in P2WSH, if this script
         // is a witness program, don't return addresses for a segwit programs.
-        if (type.get_str() == "pubkey" || type.get_str() == "pubkeyhash" || type.get_str() == "pubkeyhash_replay" || type.get_str() == "multisig" || type.get_str() == "multisig_data" || type.get_str() == "nonstandard") {
+        if (type.get_str() == "pubkey" || type.get_str() == "pubkey_replay" || type.get_str() == "pubkey_data_replay" || type.get_str() == "pubkeyhash" || type.get_str() == "pubkeyhash_replay" || type.get_str() == "multisig" || type.get_str() == "multisig_data" || type.get_str() == "nonstandard") {
             std::vector<std::vector<unsigned char>> solutions_data;
             TxoutType which_type = Solver(script, solutions_data);
             // Uncompressed pubkeys cannot be used with segwit checksigs.
             // If the script contains an uncompressed pubkey, skip encoding of a segwit program.
-            if ((which_type == TxoutType::PUBKEY) || (which_type == TxoutType::MULTISIG) || (which_type == TxoutType::MULTISIG_DATA)) {
+            if ((which_type == TxoutType::PUBKEY) || (which_type == TxoutType::PUBKEY_REPLAY) || (which_type == TxoutType::PUBKEY_DATA_REPLAY) || (which_type == TxoutType::MULTISIG) || (which_type == TxoutType::MULTISIG_DATA)) {
                 for (const auto& solution : solutions_data) {
                     if ((solution.size() != 1) && !CPubKey(solution).IsCompressed()) {
                         return r;
@@ -611,7 +611,7 @@ static RPCHelpMan decodescript()
             }
             UniValue sr(UniValue::VOBJ);
             CScript segwitScr;
-            if (which_type == TxoutType::PUBKEY) {
+            if (which_type == TxoutType::PUBKEY || which_type == TxoutType::PUBKEY_REPLAY || which_type == TxoutType::PUBKEY_DATA_REPLAY) {
                 segwitScr = GetScriptForDestination(WitnessV0KeyHash(Hash160(solutions_data[0])));
             } else if (which_type == TxoutType::PUBKEYHASH || which_type == TxoutType::PUBKEYHASH_REPLAY) {
                 segwitScr = GetScriptForDestination(WitnessV0KeyHash(uint160{solutions_data[0]}));

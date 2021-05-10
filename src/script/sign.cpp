@@ -114,6 +114,8 @@ static bool SignStep(const SigningProvider& provider, const BaseSignatureCreator
     case TxoutType::WITNESS_V1_TAPROOT:
         return false;
     case TxoutType::PUBKEY:
+    case TxoutType::PUBKEY_REPLAY:
+    case TxoutType::PUBKEY_DATA_REPLAY:
         if (!CreateSig(creator, sigdata, provider, sig, CPubKey(vSolutions[0]), scriptPubKey, sigversion)) return false;
         ret.push_back(std::move(sig));
         return true;

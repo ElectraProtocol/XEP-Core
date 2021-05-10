@@ -137,6 +137,8 @@ enum class TxoutType {
     NONSTANDARD,
     // 'standard' transaction types:
     PUBKEY,
+    PUBKEY_REPLAY,
+    PUBKEY_DATA_REPLAY,
     PUBKEYHASH,
     PUBKEYHASH_REPLAY,
     SCRIPTHASH,

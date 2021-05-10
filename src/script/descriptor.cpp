@@ -988,7 +988,7 @@ std::unique_ptr<DescriptorImpl> InferScript(const CScript& script, ParseScriptCo
     std::vector<std::vector<unsigned char>> data;
     TxoutType txntype = Solver(script, data);
 
-    if (txntype == TxoutType::PUBKEY) {
+    if (txntype == TxoutType::PUBKEY || txntype == TxoutType::PUBKEY_REPLAY || txntype == TxoutType::PUBKEY_DATA_REPLAY) {
         CPubKey pubkey(data[0].begin(), data[0].end());
         if (pubkey.IsValid()) {
             return MakeUnique<PKDescriptor>(InferPubkey(pubkey, ctx, provider));

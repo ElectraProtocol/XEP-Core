@@ -49,6 +49,8 @@ std::string GetTxnOutputType(TxoutType t)
     {
     case TxoutType::NONSTANDARD: return "nonstandard";
     case TxoutType::PUBKEY: return "pubkey";
+    case TxoutType::PUBKEY_REPLAY: return "pubkey_replay";
+    case TxoutType::PUBKEY_DATA_REPLAY: return "pubkey_data_replay";
     case TxoutType::PUBKEYHASH: return "pubkeyhash";
     case TxoutType::PUBKEYHASH_REPLAY: return "pubkeyhash_replay";
     case TxoutType::SCRIPTHASH: return "scripthash";
@@ -140,6 +142,49 @@ static bool IsMinimallyEncoded(const valtype& vch)
         return true;
     } else
         return false;
+}
+
+static bool MatchPayToPubkeyReplay(const CScript& script, valtype& pubkey)
+{
+    const unsigned int scriptSize = script.size();
+    if (scriptSize < (CPubKey::COMPRESSED_SIZE + 6) || scriptSize > (CPubKey::COMPRESSED_SIZE + 42) || script[0] != CPubKey::COMPRESSED_SIZE ||
+        script[CPubKey::COMPRESSED_SIZE + 1] != OP_CHECKSIG || script[scriptSize - 2] != OP_CHECKBLOCKATHEIGHTVERIFY || script.back() != OP_2DROP) return false;
+
+    opcodetype opcode;
+    valtype data;
+    CScript::const_iterator it = script.begin() + CPubKey::COMPRESSED_SIZE + 2;
+
+    if (!script.GetOp(it, opcode, data) || data.size() > 32 /* uint256 size */) return false;
+    // Optionally ensure leading zeroes are trimmed from the block hash
+    if (!IsSmallInteger(opcode) && (!IsMinimalPush(data, opcode) /*|| data.size() == 0 || (data.back() & 0xff) == 0*/)) return false;
+    if (!script.GetOp(it, opcode, data) || data.size() > 4 /* int32_t size */) return false;
+    if (!IsSmallInteger(opcode) && (!IsMinimalPush(data, opcode) || !IsMinimallyEncoded(data))) return false;
+
+    pubkey = valtype(script.begin() + 1, script.begin() + CPubKey::COMPRESSED_SIZE + 1);
+    return CPubKey::ValidSize(pubkey);
+}
+
+static bool MatchPayToPubkeyDataReplay(const CScript& script, valtype& pubkey)
+{
+    const unsigned int scriptSize = script.size();
+    if (scriptSize < (CPubKey::COMPRESSED_SIZE + 8) || scriptSize > (CPubKey::COMPRESSED_SIZE + 125) || script[0] != CPubKey::COMPRESSED_SIZE ||
+        script[CPubKey::COMPRESSED_SIZE + 1] != OP_CHECKSIG || script[scriptSize - 2] != OP_CHECKBLOCKATHEIGHTVERIFY || script.back() != OP_2DROP) return false;
+
+    opcodetype opcode;
+    valtype data;
+    CScript::const_iterator it = script.begin() + CPubKey::COMPRESSED_SIZE + 2;
+
+    if (!script.GetOp(it, opcode, data) || data.size() < 1 || data.size() > MAX_MULTISIG_DATA_OP_DROP_SIZE || !IsMinimalPush(data, opcode)) return false;
+    if (!script.GetOp(it, opcode, data) || opcode != OP_DROP) return false;
+
+    if (!script.GetOp(it, opcode, data) || data.size() > 32 /* uint256 size */) return false;
+    // Optionally ensure leading zeroes are trimmed from the block hash
+    if (!IsSmallInteger(opcode) && (!IsMinimalPush(data, opcode) /*|| data.size() == 0 || (data.back() & 0xff) == 0*/)) return false;
+    if (!script.GetOp(it, opcode, data) || data.size() > 4 /* int32_t size */) return false;
+    if (!IsSmallInteger(opcode) && (!IsMinimalPush(data, opcode) || !IsMinimallyEncoded(data))) return false;
+
+    pubkey = valtype(script.begin() + 1, script.begin() + CPubKey::COMPRESSED_SIZE + 1);
+    return CPubKey::ValidSize(pubkey);
 }
 
 static bool MatchPayToScriptHashReplay(const CScript& script)
@@ -277,6 +322,16 @@ TxoutType Solver(const CScript& scriptPubKey, std::vector<std::vector<unsigned c
         return TxoutType::PUBKEY;
     }
 
+    if (MatchPayToPubkeyReplay(scriptPubKey, data)) {
+        vSolutionsRet.push_back(std::move(data));
+        return TxoutType::PUBKEY_REPLAY;
+    }
+
+    if (MatchPayToPubkeyDataReplay(scriptPubKey, data)) {
+        vSolutionsRet.push_back(std::move(data));
+        return TxoutType::PUBKEY_DATA_REPLAY;
+    }
+
     if (MatchPayToPubkeyHash(scriptPubKey, data)) {
         vSolutionsRet.push_back(std::move(data));
         return TxoutType::PUBKEYHASH;
@@ -313,7 +368,7 @@ bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
     std::vector<valtype> vSolutions;
     TxoutType whichType = Solver(scriptPubKey, vSolutions);
 
-    if (whichType == TxoutType::PUBKEY) {
+    if (whichType == TxoutType::PUBKEY || whichType == TxoutType::PUBKEY_REPLAY || whichType == TxoutType::PUBKEY_DATA_REPLAY) {
         CPubKey pubKey(vSolutions[0]);
         if (!pubKey.IsValid())
             return false;

@@ -878,7 +878,9 @@ static std::string RecurseImportData(const CScript& script, ImportData& import_d
     TxoutType script_type = Solver(script, solverdata);
 
     switch (script_type) {
-    case TxoutType::PUBKEY: {
+    case TxoutType::PUBKEY:
+    case TxoutType::PUBKEY_REPLAY:
+    case TxoutType::PUBKEY_DATA_REPLAY: {
         CPubKey pubkey(solverdata[0].begin(), solverdata[0].end());
         import_data.used_keys.emplace(pubkey.GetID(), false);
         return "";
