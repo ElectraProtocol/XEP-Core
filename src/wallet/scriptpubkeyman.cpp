@@ -1657,7 +1657,7 @@ bool DescriptorScriptPubKeyMan::GetNewDestination(const OutputType type, CTxDest
     }
 }
 
-static CScript StripReplayProtectionData(CScript newScript)
+static CScript StripAdditionalTransactionData(CScript newScript)
 {
     const unsigned int scriptSize = newScript.size();
     if (scriptSize >= 29 && scriptSize <= 65 && newScript[0] == OP_DUP && newScript[1] == OP_HASH160 && newScript[2] == 20 && newScript[23] == OP_EQUALVERIFY &&
@@ -1666,6 +1666,9 @@ static CScript StripReplayProtectionData(CScript newScript)
     } else if (scriptSize >= 27 && scriptSize <= 63 && newScript[0] == OP_HASH160 && newScript[1] == 20 && newScript[22] == OP_EQUAL &&
                newScript[scriptSize - 2] == OP_CHECKBLOCKATHEIGHTVERIFY && newScript.back() == OP_2DROP) { // TxoutType::SCRIPTHASH_REPLAY
         newScript = CScript(newScript.begin(), newScript.begin() + 23);
+    } else if (scriptSize >= (CPubKey::COMPRESSED_SIZE + 6) && scriptSize <= (CPubKey::COMPRESSED_SIZE + 125) && newScript[0] == CPubKey::COMPRESSED_SIZE && newScript[CPubKey::COMPRESSED_SIZE + 1] == OP_CHECKSIG &&
+               newScript[scriptSize - 2] == OP_CHECKBLOCKATHEIGHTVERIFY && newScript.back() == OP_2DROP) { // TxoutType::PUBKEY_REPLAY and TxoutType::PUBKEY_DATA_REPLAY
+        newScript = CScript(newScript.begin(), newScript.begin() + CPubKey::COMPRESSED_SIZE + 2);
     }
     return newScript;
 }
@@ -1673,7 +1676,7 @@ static CScript StripReplayProtectionData(CScript newScript)
 isminetype DescriptorScriptPubKeyMan::IsMine(const CScript& script) const
 {
     LOCK(cs_desc_man);
-    if (m_map_script_pub_keys.count(StripReplayProtectionData(script)) > 0) {
+    if (m_map_script_pub_keys.count(StripAdditionalTransactionData(script)) > 0) {
         return ISMINE_SPENDABLE;
     }
     return ISMINE_NO;
@@ -1862,7 +1865,7 @@ void DescriptorScriptPubKeyMan::MarkUnusedAddresses(const CScript& script)
 {
     LOCK(cs_desc_man);
     if (IsMine(script)) {
-        int32_t index = m_map_script_pub_keys[StripReplayProtectionData(script)];
+        int32_t index = m_map_script_pub_keys[StripAdditionalTransactionData(script)];
         if (index >= m_wallet_descriptor.next_index) {
             WalletLogPrintf("%s: Detected a used keypool item at index %d, mark all keypool items up to this item as used\n", __func__, index);
             m_wallet_descriptor.next_index = index + 1;
@@ -2027,7 +2030,7 @@ std::unique_ptr<FlatSigningProvider> DescriptorScriptPubKeyMan::GetSigningProvid
     LOCK(cs_desc_man);
 
     // Find the index of the script
-    auto it = m_map_script_pub_keys.find(StripReplayProtectionData(script));
+    auto it = m_map_script_pub_keys.find(StripAdditionalTransactionData(script));
     if (it == m_map_script_pub_keys.end()) {
         return nullptr;
     }
