@@ -596,8 +596,8 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                 if (gArgs.GetBoolArg("-debug", false) && gArgs.GetBoolArg("-printcoinstake", false))
                     LogPrintf("%s : parsed kernel type=%s\n", __func__, GetTxnOutputType(whichType));
 
-                if (whichType == TxoutType::PUBKEY || whichType == TxoutType::PUBKEYHASH || whichType == TxoutType::PUBKEYHASH_REPLAY || whichType == TxoutType::WITNESS_V0_KEYHASH || whichType == TxoutType::SCRIPTHASH ||
-                    whichType == TxoutType::SCRIPTHASH_REPLAY || whichType == TxoutType::WITNESS_V0_SCRIPTHASH) { // we support p2pkh, p2wpkh, p2sh-p2wpkh, and p2sh/p2wsh-multisig inputs
+                if (whichType == TxoutType::PUBKEY || whichType == TxoutType::PUBKEY_REPLAY || whichType == TxoutType::PUBKEY_DATA_REPLAY || whichType == TxoutType::PUBKEYHASH || whichType == TxoutType::PUBKEYHASH_REPLAY ||
+                    whichType == TxoutType::WITNESS_V0_KEYHASH || whichType == TxoutType::SCRIPTHASH || whichType == TxoutType::SCRIPTHASH_REPLAY || whichType == TxoutType::WITNESS_V0_SCRIPTHASH) { // we support p2pkh, p2wpkh, p2sh-p2wpkh, and p2sh/p2wsh-multisig inputs
                     const bool fNewStakingCodeActive = nHeight >= consensusParams.nMandatoryUpgradeBlock;
                     if (whichType == TxoutType::SCRIPTHASH || whichType == TxoutType::WITNESS_V0_SCRIPTHASH) { // a p2sh/p2wsh input could be many things, but we only support p2sh-p2wpkh and multisig for now
                         CScript subscript;
@@ -642,6 +642,8 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                             scriptPubKeyOut = GetScriptForDestination(dest);
                         } else
                             continue;
+                    } else if (whichType == TxoutType::PUBKEY_REPLAY || whichType == TxoutType::PUBKEY_DATA_REPLAY) {
+                        scriptPubKeyOut << vSolutions[0] << OP_CHECKSIG;
                     } else if (pwallet->IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS) || whichType == TxoutType::PUBKEY) { // descriptor wallets only credit earnings back to the original address and p2pk inputs can be left alone
                         scriptPubKeyOut = scriptPubKeyKernel;
                     } else { // on legacy wallets we can convert every input to p2pk for smaller coinstake TXs
