@@ -633,7 +633,7 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                             LogPrintf("%s : failed to get new destination for coinstake (%s)\n", __func__, error);
                             scriptPubKeyOut = scriptPubKeyKernel;
                         }
-                    } else if (whichType == TxoutType::PUBKEYHASH_REPLAY || whichType == TxoutType::SCRIPTHASH_REPLAY || whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_DATA) { // try to create a new destination for p2sh/p2wsh-multisig inputs
+                    } else if (whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_DATA) { // try to create a new destination for p2sh/p2wsh-multisig inputs
                         OutputType output_type = OutputType::BECH32;
                         CTxDestination dest;
                         std::string error;
@@ -644,6 +644,10 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                             continue;
                     } else if (whichType == TxoutType::PUBKEY_REPLAY || whichType == TxoutType::PUBKEY_DATA_REPLAY) {
                         scriptPubKeyOut << vSolutions[0] << OP_CHECKSIG;
+                    } else if (whichType == TxoutType::PUBKEYHASH_REPLAY) {
+                        scriptPubKeyOut << OP_DUP << OP_HASH160 << vSolutions[0] << OP_EQUALVERIFY << OP_CHECKSIG;
+                    } else if (whichType == TxoutType::SCRIPTHASH_REPLAY) {
+                        scriptPubKeyOut << OP_HASH160 << vSolutions[0] << OP_EQUAL;
                     } else if (pwallet->IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS) || whichType == TxoutType::PUBKEY) { // descriptor wallets only credit earnings back to the original address and p2pk inputs can be left alone
                         scriptPubKeyOut = scriptPubKeyKernel;
                     } else { // on legacy wallets we can convert every input to p2pk for smaller coinstake TXs
