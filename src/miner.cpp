@@ -609,7 +609,7 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                             hash = uint160(vSolutions[0]);
                         if (provider && provider->GetCScript(CScriptID(hash), subscript)) { // extract the redeem script
                             TxoutType scriptType = Solver(subscript, vSolutions);
-                            if (!fNewStakingCodeActive || (scriptType != TxoutType::WITNESS_V0_KEYHASH && scriptType != TxoutType::MULTISIG && scriptType != TxoutType::MULTISIG_DATA)) { // this is a script we don't recognize
+                            if (!fNewStakingCodeActive || (scriptType != TxoutType::WITNESS_V0_KEYHASH && scriptType != TxoutType::MULTISIG && scriptType != TxoutType::MULTISIG_REPLAY && scriptType != TxoutType::MULTISIG_DATA && scriptType != TxoutType::MULTISIG_DATA_REPLAY)) { // this is a script we don't recognize
                                 if (gArgs.GetBoolArg("-debug", false) && gArgs.GetBoolArg("-printcoinstake", false))
                                     LogPrintf("%s : no support for %s kernel type=%s\n", __func__, GetTxnOutputType(whichType), GetTxnOutputType(scriptType));
                                 continue;
@@ -633,7 +633,7 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                             LogPrintf("%s : failed to get new destination for coinstake (%s)\n", __func__, error);
                             scriptPubKeyOut = scriptPubKeyKernel;
                         }
-                    } else if (whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_DATA) { // try to create a new destination for p2sh/p2wsh-multisig inputs
+                    } else if (whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_REPLAY || whichType == TxoutType::MULTISIG_DATA || whichType == TxoutType::MULTISIG_DATA_REPLAY) { // try to create a new destination for p2sh/p2wsh-multisig inputs
                         OutputType output_type = OutputType::BECH32;
                         CTxDestination dest;
                         std::string error;
@@ -661,7 +661,7 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                         }
                         scriptPubKeyOut << ToByteVector(pubkey) << OP_CHECKSIG;
                     }
-                } else if (!pwallet->IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS) && (whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_DATA)) { // convert multisig to p2pk
+                } else if (!pwallet->IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS) && (whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_REPLAY || whichType == TxoutType::MULTISIG_DATA || whichType == TxoutType::MULTISIG_DATA_REPLAY)) { // convert multisig to p2pk
                     // convert to pay to public key type
                     CPubKey pubkey;
                     bool found = false;
