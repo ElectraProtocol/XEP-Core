@@ -144,7 +144,9 @@ enum class TxoutType {
     SCRIPTHASH,
     SCRIPTHASH_REPLAY,
     MULTISIG,
+    MULTISIG_REPLAY,
     MULTISIG_DATA,
+    MULTISIG_DATA_REPLAY,
     NULL_DATA, //!< unspendable OP_RETURN script that carries data
     WITNESS_V0_SCRIPTHASH,
     WITNESS_V0_KEYHASH,

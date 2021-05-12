@@ -602,12 +602,12 @@ static RPCHelpMan decodescript()
         r.pushKV("p2sh", EncodeDestination(ScriptHash(script)));
         // P2SH and witness programs cannot be wrapped in P2WSH, if this script
         // is a witness program, don't return addresses for a segwit programs.
-        if (typeStr == "pubkey" || typeStr == "pubkey_replay" || typeStr == "pubkey_data_replay" || typeStr == "pubkeyhash" || typeStr == "pubkeyhash_replay" || typeStr == "multisig" || typeStr == "multisig_data" || typeStr == "nonstandard") {
+        if (typeStr == "pubkey" || typeStr == "pubkey_replay" || typeStr == "pubkey_data_replay" || typeStr == "pubkeyhash" || typeStr == "pubkeyhash_replay" || typeStr == "multisig" || typeStr == "multisig_replay" || typeStr == "multisig_data" || typeStr == "multisig_data_replay" || typeStr == "nonstandard") {
             std::vector<std::vector<unsigned char>> solutions_data;
             TxoutType which_type = Solver(script, solutions_data);
             // Uncompressed pubkeys cannot be used with segwit checksigs.
             // If the script contains an uncompressed pubkey, skip encoding of a segwit program.
-            if (which_type == TxoutType::PUBKEY || which_type == TxoutType::PUBKEY_REPLAY || which_type == TxoutType::PUBKEY_DATA_REPLAY || which_type == TxoutType::MULTISIG || which_type == TxoutType::MULTISIG_DATA) {
+            if (which_type == TxoutType::PUBKEY || which_type == TxoutType::PUBKEY_REPLAY || which_type == TxoutType::PUBKEY_DATA_REPLAY || which_type == TxoutType::MULTISIG || which_type == TxoutType::MULTISIG_REPLAY || which_type == TxoutType::MULTISIG_DATA || which_type == TxoutType::MULTISIG_DATA_REPLAY) {
                 for (const auto& solution : solutions_data) {
                     if ((solution.size() != 1) && !CPubKey(solution).IsCompressed()) {
                         return r;

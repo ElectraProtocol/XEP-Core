@@ -145,7 +145,9 @@ static bool SignStep(const SigningProvider& provider, const BaseSignatureCreator
         return false;
 
     case TxoutType::MULTISIG:
-    case TxoutType::MULTISIG_DATA: {
+    case TxoutType::MULTISIG_REPLAY:
+    case TxoutType::MULTISIG_DATA:
+    case TxoutType::MULTISIG_DATA_REPLAY: {
         size_t required = vSolutions.front()[0];
         ret.push_back(valtype()); // workaround CHECKMULTISIG bug
         for (size_t i = 1; i < vSolutions.size() - 1; ++i) {
@@ -336,7 +338,7 @@ SignatureData DataFromTransaction(const CMutableTransaction& tx, unsigned int nI
         stack.witness.clear();
         sigversion = SigVersion::WITNESS_V0;
     }
-    if ((script_type == TxoutType::MULTISIG || script_type == TxoutType::MULTISIG_DATA) && !stack.script.empty()) {
+    if ((script_type == TxoutType::MULTISIG || script_type == TxoutType::MULTISIG_REPLAY || script_type == TxoutType::MULTISIG_DATA || script_type == TxoutType::MULTISIG_DATA_REPLAY) && !stack.script.empty()) {
         // Build a map of pubkey -> signature by matching sigs to pubkeys:
         assert(solutions.size() > 1);
         unsigned int num_pubkeys = solutions.size()-2;

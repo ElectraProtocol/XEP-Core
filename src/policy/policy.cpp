@@ -57,7 +57,7 @@ bool IsStandard(const CScript& scriptPubKey, TxoutType& whichType)
 
     if (whichType == TxoutType::NONSTANDARD) {
         return false;
-    } else if (whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_DATA) {
+    } else if (whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_REPLAY || whichType == TxoutType::MULTISIG_DATA || whichType == TxoutType::MULTISIG_DATA_REPLAY) {
         unsigned char m = vSolutions.front()[0];
         unsigned char n = vSolutions.back()[0];
         // Support up to x-of-3 multisig txns as standard
@@ -112,7 +112,7 @@ bool IsStandardTx(const CTransaction& tx, bool permit_bare_multisig, const CFeeR
 
         if (whichType == TxoutType::NULL_DATA)
             nDataOut++;
-        else if ((whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_DATA) && (!permit_bare_multisig)) {
+        else if ((whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_REPLAY || whichType == TxoutType::MULTISIG_DATA || whichType == TxoutType::MULTISIG_DATA_REPLAY) && (!permit_bare_multisig)) {
             reason = "bare-multisig";
             return false;
         } else if (IsDust(txout, dust_relay_fee)) {

@@ -171,7 +171,9 @@ IsMineResult IsMineInner(const LegacyScriptPubKeyMan& keystore, const CScript& s
     }
 
     case TxoutType::MULTISIG:
+    case TxoutType::MULTISIG_REPLAY:
     case TxoutType::MULTISIG_DATA:
+    case TxoutType::MULTISIG_DATA_REPLAY:
     {
         // Never treat bare multisig outputs as ours unless they are a single pubkey (they can still be made watchonly-though)
         if (sigversion == IsMineSigVersion::TOP && (vSolutions.size() != 3 || vSolutions.front()[0] != 1 || vSolutions.back()[0] != 1)) {
