@@ -591,18 +591,23 @@ static RPCHelpMan decodescript()
     UniValue type;
     type = find_value(r, "type");
 
-    if (type.isStr() && type.get_str() != "scripthash" && type.get_str() != "scripthash_replay") {
+    std::string typeStr = "scripthash";
+    if (type.isStr()) {
+        typeStr = type.get_str();
+    }
+
+    if (typeStr != "scripthash" && typeStr != "scripthash_replay") {
         // P2SH cannot be wrapped in a P2SH. If this script is already a P2SH,
         // don't return the address for a P2SH of the P2SH.
         r.pushKV("p2sh", EncodeDestination(ScriptHash(script)));
         // P2SH and witness programs cannot be wrapped in P2WSH, if this script
         // is a witness program, don't return addresses for a segwit programs.
-        if (type.get_str() == "pubkey" || type.get_str() == "pubkey_replay" || type.get_str() == "pubkey_data_replay" || type.get_str() == "pubkeyhash" || type.get_str() == "pubkeyhash_replay" || type.get_str() == "multisig" || type.get_str() == "multisig_data" || type.get_str() == "nonstandard") {
+        if (typeStr == "pubkey" || typeStr == "pubkey_replay" || typeStr == "pubkey_data_replay" || typeStr == "pubkeyhash" || typeStr == "pubkeyhash_replay" || typeStr == "multisig" || typeStr == "multisig_data" || typeStr == "nonstandard") {
             std::vector<std::vector<unsigned char>> solutions_data;
             TxoutType which_type = Solver(script, solutions_data);
             // Uncompressed pubkeys cannot be used with segwit checksigs.
             // If the script contains an uncompressed pubkey, skip encoding of a segwit program.
-            if ((which_type == TxoutType::PUBKEY) || (which_type == TxoutType::PUBKEY_REPLAY) || (which_type == TxoutType::PUBKEY_DATA_REPLAY) || (which_type == TxoutType::MULTISIG) || (which_type == TxoutType::MULTISIG_DATA)) {
+            if (which_type == TxoutType::PUBKEY || which_type == TxoutType::PUBKEY_REPLAY || which_type == TxoutType::PUBKEY_DATA_REPLAY || which_type == TxoutType::MULTISIG || which_type == TxoutType::MULTISIG_DATA) {
                 for (const auto& solution : solutions_data) {
                     if ((solution.size() != 1) && !CPubKey(solution).IsCompressed()) {
                         return r;
