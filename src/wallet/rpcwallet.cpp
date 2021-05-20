@@ -366,7 +366,7 @@ static RPCHelpMan setlabel()
     };
 }
 
-void ParseRecipients(const UniValue& address_amounts, const UniValue& subtract_fee_outputs, std::vector<CRecipient> &recipients) {
+void ParseRecipients(CWallet* const pwallet, const UniValue& address_amounts, const UniValue& subtract_fee_outputs, std::vector<CRecipient> &recipients) {
     std::set<CTxDestination> destinations;
     int i = 0;
     for (const std::string& address: address_amounts.getKeys()) {
@@ -381,6 +381,12 @@ void ParseRecipients(const UniValue& address_amounts, const UniValue& subtract_f
         destinations.insert(dest);
 
         CScript script_pub_key = GetScriptForDestination(dest);
+        if (dest.which() == 1 /* PKHash */ || dest.which() == 2 /* ScriptHash */) {
+            const int nHeight = std::max(pwallet->GetLastBlockHeight() - 100, 0);
+            if (nHeight >= 180000) {
+                script_pub_key << ToByteVector(pwallet->chain().getBlockHash(nHeight)) << nHeight << OP_CHECKBLOCKATHEIGHTVERIFY << OP_2DROP;
+            }
+        }
         CAmount amount = AmountFromValue(address_amounts[i++]);
 
         bool subtract_fee = false;
@@ -518,7 +524,7 @@ static RPCHelpMan sendtoaddress()
     }
 
     std::vector<CRecipient> recipients;
-    ParseRecipients(address_amounts, subtractFeeFromAmount, recipients);
+    ParseRecipients(pwallet, address_amounts, subtractFeeFromAmount, recipients);
     const bool verbose{request.params[10].isNull() ? false : request.params[10].get_bool()};
 
     return SendMoney(pwallet, coin_control, recipients, mapValue, verbose);
@@ -1030,7 +1036,7 @@ static RPCHelpMan sendmany()
     SetFeeEstimateMode(*pwallet, coin_control, /* conf_target */ request.params[6], /* estimate_mode */ request.params[7], /* fee_rate */ request.params[8], /* override_min_fee */ false);
 
     std::vector<CRecipient> recipients;
-    ParseRecipients(sendTo, subtractFeeFromAmount, recipients);
+    ParseRecipients(pwallet, sendTo, subtractFeeFromAmount, recipients);
     const bool verbose{request.params[9].isNull() ? false : request.params[9].get_bool()};
 
     return SendMoney(pwallet, coin_control, recipients, std::move(mapValue), verbose);
