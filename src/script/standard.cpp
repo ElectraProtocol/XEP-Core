@@ -189,7 +189,7 @@ static bool MatchPayToPubkeyDataReplay(const CScript& script, valtype& pubkey)
     return CPubKey::ValidSize(pubkey);
 }
 
-static bool MatchPayToScriptHashReplay(const CScript& script)
+static bool MatchPayToScriptHashReplay(const CScript& script, std::vector<valtype>& txData)
 {
     const unsigned int scriptSize = script.size();
     if (scriptSize < 27 || scriptSize > 63 || script[0] != OP_HASH160 || script[1] != 20 || script[22] != OP_EQUAL ||
@@ -202,8 +202,10 @@ static bool MatchPayToScriptHashReplay(const CScript& script)
     if (!script.GetOp(it, opcode, data) || data.size() > 32 /* uint256 size */) return false;
     // Optionally ensure leading zeroes are trimmed from the block hash
     if (!IsSmallInteger(opcode) && (!IsMinimalPush(data, opcode) /*|| data.size() == 0 || (data.back() & 0xff) == 0*/)) return false;
+    txData.push_back(data);
     if (!script.GetOp(it, opcode, data) || data.size() > 4 /* int32_t size */) return false;
     if (!IsSmallInteger(opcode) && (!IsMinimalPush(data, opcode) || !IsMinimallyEncoded(data))) return false;
+    txData.push_back(data);
 
     return true;
 }
@@ -338,7 +340,9 @@ TxoutType Solver(const CScript& scriptPubKey, std::vector<std::vector<unsigned c
     {
         std::vector<unsigned char> hashBytes(scriptPubKey.begin()+2, scriptPubKey.begin()+22);
         vSolutionsRet.push_back(hashBytes);
-        if (MatchPayToScriptHashReplay(scriptPubKey)) {
+        std::vector<std::vector<unsigned char>> txData;
+        if (MatchPayToScriptHashReplay(scriptPubKey, txData)) {
+            vSolutionsRet.insert(vSolutionsRet.end(), txData.begin(), txData.end());
             return TxoutType::SCRIPTHASH_REPLAY;
         } else {
             return TxoutType::SCRIPTHASH;
