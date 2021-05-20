@@ -18,6 +18,7 @@
 #include <qt/sendcoinsdialog.h>
 #include <qt/transactiontablemodel.h>
 
+#include <interfaces/chain.h>
 #include <interfaces/handler.h>
 #include <interfaces/node.h>
 #include <key_io.h>
@@ -175,7 +176,15 @@ WalletModel::SendCoinsReturn WalletModel::prepareTransaction(WalletModelTransact
             setAddress.insert(rcp.address);
             ++nAddresses;
 
-            CScript scriptPubKey = GetScriptForDestination(DecodeDestination(rcp.address.toStdString()));
+            const CTxDestination dest = DecodeDestination(rcp.address.toStdString());
+            CScript scriptPubKey = GetScriptForDestination(dest);
+            if (m_client_model && (dest.which() == 1 /* PKHash */ || dest.which() == 2 /* ScriptHash */)) {
+                const int nHeight = std::max(m_client_model->getNumBlocks() - 100, 0);
+                if (nHeight >= 180000) {
+                    std::unique_ptr<interfaces::Chain> chain = interfaces::MakeChain(*m_client_model->node().context());
+                    scriptPubKey << ToByteVector(chain->getBlockHash(nHeight)) << nHeight << OP_CHECKBLOCKATHEIGHTVERIFY << OP_2DROP;
+                }
+            }
             CRecipient recipient = {scriptPubKey, rcp.amount, rcp.fSubtractFeeFromAmount};
             vecSend.push_back(recipient);
 
