@@ -590,7 +590,7 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
         std::vector<std::vector<unsigned char>> vSolutions;
         for (const CTxOut& txout : tx.vout) {
             TxoutType whichType = Solver(txout.scriptPubKey, vSolutions);
-            if (whichType == TxoutType::PUBKEYHASH_REPLAY || whichType == TxoutType::SCRIPTHASH_REPLAY) {
+            if (whichType == TxoutType::PUBKEYHASH_REPLAY || whichType == TxoutType::SCRIPTHASH_REPLAY || whichType == TxoutType::PUBKEY_REPLAY || whichType == TxoutType::PUBKEY_DATA_REPLAY) {
                 // Some of these checks are redundant with the standardness checks above
                 reason = "replay-height";
                 if (vSolutions.size() != 3 || vSolutions[2].size() > 4 || vSolutions[2].size() < 1) {
