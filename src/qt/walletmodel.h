@@ -73,7 +73,8 @@ public:
     {
         Unencrypted,  // !wallet->IsCrypted()
         Locked,       // wallet->IsCrypted() && wallet->IsLocked()
-        Unlocked      // wallet->IsCrypted() && !wallet->IsLocked()
+        Unlocked,     // wallet->IsCrypted() && !wallet->IsLocked()
+        UnlockedAskingForPassword // wallet is unlocked but will still ask for the password before sending/signing
     };
 
     OptionsModel *getOptionsModel();
@@ -107,14 +108,14 @@ public:
     // Wallet encryption
     bool setWalletEncrypted(bool encrypted, const SecureString &passphrase);
     // Passphrase only needed when unlocking
-    bool setWalletLocked(bool locked, const SecureString &passPhrase=SecureString());
+    bool setWalletLocked(bool locked, bool fAskingForPassword, const SecureString &passPhrase=SecureString());
     bool changePassphrase(const SecureString &oldPass, const SecureString &newPass);
 
     // RAI object for unlocking wallet, returned by requestUnlock()
     class UnlockContext
     {
     public:
-        UnlockContext(WalletModel *wallet, bool valid, bool relock);
+        UnlockContext(WalletModel *wallet, bool valid, bool relock, bool asking_for_password);
         ~UnlockContext();
 
         bool isValid() const { return valid; }
@@ -128,6 +129,7 @@ public:
         WalletModel *wallet;
         bool valid;
         mutable bool relock; // mutable, as it can be set to false by copying
+        bool asking_for_password;
 
         UnlockContext& operator=(const UnlockContext&) = default;
         void CopyFrom(UnlockContext&& rhs);
@@ -158,6 +160,9 @@ public:
 
     uint256 getLastBlockProcessed() const;
 
+    bool getLastPasswordEnteredValid() const { return fLastPasswordEnteredValid; }
+    void setLastPasswordEnteredValid(bool value) { fLastPasswordEnteredValid = value; }
+
 private:
     std::unique_ptr<interfaces::Wallet> m_wallet;
     std::unique_ptr<interfaces::Handler> m_handler_unload;
@@ -172,6 +177,8 @@ private:
 
     bool fHaveWatchOnly;
     bool fForceCheckBalanceChanged{false};
+
+    std::atomic<bool> fLastPasswordEnteredValid{false};
 
     // Wallet has an options model for wallet-specific options
     // (transaction fee, for example)

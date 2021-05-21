@@ -626,13 +626,15 @@ private:
     CKeyingMaterial vMasterKey GUARDED_BY(cs_wallet);
 
 
-    bool Unlock(const CKeyingMaterial& vMasterKeyIn, bool accept_no_keys = false);
+    bool Unlock(const CKeyingMaterial& vMasterKeyIn, bool fAskingForPassword = false, bool accept_no_keys = false);
 
     std::atomic<bool> fAbortRescan{false};
     std::atomic<bool> fScanningWallet{false}; // controlled by WalletRescanReserver
     std::atomic<int64_t> m_scanning_start{0};
     std::atomic<double> m_scanning_progress{0};
     friend class WalletRescanReserver;
+
+    std::atomic<bool> fUnlockedAskingForPassword{false};
 
     //! the current wallet version: clients below this version are not able to load the wallet
     int nWalletVersion GUARDED_BY(cs_wallet){FEATURE_BASE};
@@ -771,7 +773,9 @@ public:
 
     bool IsCrypted() const;
     bool IsLocked() const override;
-    bool Lock();
+    bool IsUnlockedAskingForPassword() const { return fUnlockedAskingForPassword; }
+    bool Lock(bool fAskingForPassword = false);
+    void SetUnlockedAskingForPassword(bool value) { fUnlockedAskingForPassword = value; }
 
     /** Interface to assert chain access */
     bool HaveChain() const { return m_chain ? true : false; }
@@ -872,7 +876,7 @@ public:
 
     // Used to prevent concurrent calls to walletpassphrase RPC.
     Mutex m_unlock_mutex;
-    bool Unlock(const SecureString& strWalletPassphrase, bool accept_no_keys = false);
+    bool Unlock(const SecureString& strWalletPassphrase, bool fAskingForPassword = false, bool accept_no_keys = false);
     bool ChangeWalletPassphrase(const SecureString& strOldWalletPassphrase, const SecureString& strNewWalletPassphrase);
     bool EncryptWallet(const SecureString& strWalletPassphrase);
 

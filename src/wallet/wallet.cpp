@@ -361,7 +361,7 @@ void CWallet::UpgradeKeyMetadata()
     SetWalletFlag(WALLET_FLAG_KEY_ORIGIN_METADATA);
 }
 
-bool CWallet::Unlock(const SecureString& strWalletPassphrase, bool accept_no_keys)
+bool CWallet::Unlock(const SecureString& strWalletPassphrase, bool fAskingForPassword, bool accept_no_keys)
 {
     CCrypter crypter;
     CKeyingMaterial _vMasterKey;
@@ -374,7 +374,7 @@ bool CWallet::Unlock(const SecureString& strWalletPassphrase, bool accept_no_key
                 return false;
             if (!crypter.Decrypt(pMasterKey.second.vchCryptedKey, _vMasterKey))
                 continue; // try another master key
-            if (Unlock(_vMasterKey, accept_no_keys)) {
+            if (Unlock(_vMasterKey, fAskingForPassword, accept_no_keys)) {
                 // Now that we've unlocked, upgrade the key metadata
                 UpgradeKeyMetadata();
                 return true;
@@ -4291,21 +4291,27 @@ bool CWallet::IsLocked() const
     return vMasterKey.empty();
 }
 
-bool CWallet::Lock()
+bool CWallet::Lock(bool fAskingForPassword)
 {
     if (!IsCrypted())
         return false;
+
+    if (fAskingForPassword) {
+        SetUnlockedAskingForPassword(true);
+        return true;
+    }
 
     {
         LOCK(cs_wallet);
         vMasterKey.clear();
     }
+    SetUnlockedAskingForPassword(false);
 
     NotifyStatusChanged(this);
     return true;
 }
 
-bool CWallet::Unlock(const CKeyingMaterial& vMasterKeyIn, bool accept_no_keys)
+bool CWallet::Unlock(const CKeyingMaterial& vMasterKeyIn, bool fAskingForPassword, bool accept_no_keys)
 {
     {
         LOCK(cs_wallet);
@@ -4316,6 +4322,7 @@ bool CWallet::Unlock(const CKeyingMaterial& vMasterKeyIn, bool accept_no_keys)
         }
         vMasterKey = vMasterKeyIn;
     }
+    SetUnlockedAskingForPassword(fAskingForPassword);
     NotifyStatusChanged(this);
     return true;
 }
