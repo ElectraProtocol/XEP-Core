@@ -1836,8 +1836,7 @@ bool GenericTransactionSignatureChecker<T>::CheckBlockHash(const int32_t nHeight
         return true;
     }
 
-    const CBlockIndex* const pblockindex = (*chain)[nHeight];
-    const uint256 hash = pblockindex->GetBlockHash();
+    const uint256& hash = (*chain)[nHeight]->GetBlockHash();
     std::vector<unsigned char> vchBlockHash(hash.begin(), hash.end());
     assert(nBlockHash.size() <= vchBlockHash.size());
     vchBlockHash.erase(vchBlockHash.begin() + nBlockHash.size(), vchBlockHash.end());
