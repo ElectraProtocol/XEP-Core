@@ -585,6 +585,40 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
     if (fRequireStandard && !IsStandardTx(tx, reason))
         return state.Invalid(TxValidationResult::TX_NOT_STANDARD, reason);
 
+    // Check replay protection data references a block which is currently in the active chain
+    if (fRequireStandard) {
+        std::vector<std::vector<unsigned char>> vSolutions;
+        for (const CTxOut& txout : tx.vout) {
+            TxoutType whichType = Solver(txout.scriptPubKey, vSolutions);
+            if (whichType == TxoutType::PUBKEYHASH_REPLAY) {
+                // Some of these checks are redundant with the standardness checks above
+                reason = "replay-height";
+                if (vSolutions.size() != 3 || vSolutions[2].size() > 4 || vSolutions[2].size() < 1) {
+                    return state.Invalid(TxValidationResult::TX_NOT_STANDARD, reason);
+                }
+
+                const int nHeight = CScriptNum(vSolutions[2], true, 4).getint();
+                if (nHeight > ::ChainActive().Height() - 10 || nHeight < 0) {
+                    return state.Invalid(TxValidationResult::TX_NOT_STANDARD, reason);
+                }
+
+                reason = "replay-blockhash";
+                if (vSolutions[1].size() > 32 || vSolutions[1].size() < 1) {
+                    return state.Invalid(TxValidationResult::TX_NOT_STANDARD, reason);
+                }
+
+                const uint256& blockHash = ::ChainActive()[nHeight]->GetBlockHash();
+                std::vector<unsigned char> vchBlockHash(blockHash.begin(), blockHash.end());
+                assert(vSolutions[1].size() <= vchBlockHash.size());
+                vchBlockHash.erase(vchBlockHash.begin() + vSolutions[1].size(), vchBlockHash.end());
+
+                if (vSolutions[1] != vchBlockHash) {
+                    return state.Invalid(TxValidationResult::TX_NOT_STANDARD, reason);
+                }
+            }
+        }
+    }
+
     // Do not work on transactions that are too small.
     // A transaction with 1 segwit input and 1 P2WPHK output has non-witness size of 82 bytes.
     // Transactions smaller than this are not relayed to mitigate CVE-2017-12842 by not relaying
