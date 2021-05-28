@@ -599,6 +599,8 @@ void SetupServerArgs(NodeContext& node)
     argsman.AddArg("-staking", "Enable staking (default: true)", ArgsManager::ALLOW_BOOL, OptionsCategory::OPTIONS);
     argsman.AddArg("-quantumsafestaking", "Enable quantum computer resistant staking which does not reuse addresses with exposed public keys (default: false)", ArgsManager::ALLOW_BOOL, OptionsCategory::OPTIONS);
 
+    argsman.AddArg("-targetstakeinputs=<n>", strprintf("Configure the target number of inputs to maintain in staking wallets (default: %i). Use -1 to disable or 0 for automatic management.", DEFAULT_TARGET_STAKE_INPUTS), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+
     // Add the hidden options
     argsman.AddHiddenArgs(hidden_args);
 }

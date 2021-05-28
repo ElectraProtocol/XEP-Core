@@ -2205,7 +2205,7 @@ CAmount CWallet::GetAvailableBalance(const CCoinControl* coinControl) const
     return balance;
 }
 
-void CWallet::AvailableCoins(std::vector<COutput>& vCoins, bool fOnlySafe, const CCoinControl* coinControl, const CAmount& nMinimumAmount, const CAmount& nMaximumAmount, const CAmount& nMinimumSumAmount, const uint64_t nMaximumCount) const
+void CWallet::AvailableCoins(std::vector<COutput>& vCoins, bool fOnlySafe, const CCoinControl* coinControl, const CAmount& nMinimumAmount, const CAmount& nMaximumAmount, const CAmount& nMinimumSumAmount, const uint64_t nMaximumCount, const bool fOnlyImmature) const
 {
     AssertLockHeld(cs_wallet);
 
@@ -2227,7 +2227,7 @@ void CWallet::AvailableCoins(std::vector<COutput>& vCoins, bool fOnlySafe, const
             continue;
         }
 
-        if (wtx.IsImmatureCoinBase())
+        if ((!fOnlyImmature && wtx.IsImmatureCoinBase()) || (fOnlyImmature && !wtx.IsImmatureCoinBase()))
             continue;
 
         int nDepth = wtx.GetDepthInMainChain();
@@ -4613,19 +4613,25 @@ ScriptPubKeyMan* CWallet::AddWalletDescriptor(WalletDescriptor& desc, const Flat
     return ret;
 }
 
-bool CWallet::SelectStakeCoins(std::set<CInputCoin>& setCoins) const
+bool CWallet::SelectStakeCoins(std::set<CInputCoin>& setCoins, const bool fOnlyImmature) const
 {
     AssertLockHeld(cs_wallet);
 
     // Choose coins to use
-    CAmount nBalance = GetBalance().m_mine_trusted;
+    const Balance& bal = GetBalance();
+    CAmount nBalance = 0;
+    if (!fOnlyImmature) {
+        nBalance = bal.m_mine_trusted;
+    } else {
+        nBalance = bal.m_mine_immature;
+    }
     CAmount nValueIn = 0;
     std::vector<COutput> vAvailableCoins;
     CCoinControl temp;
     CoinSelectionParams coin_selection_params;
     coin_selection_params.use_bnb=false;
     bool bnb_used;
-    AvailableCoins(vAvailableCoins, true, &temp, 1, MAX_MONEY, MAX_MONEY, 0);
+    AvailableCoins(vAvailableCoins, true, &temp, 1, MAX_MONEY, MAX_MONEY, 0, fOnlyImmature);
 
     if (!SelectCoins(vAvailableCoins, nBalance, setCoins, nValueIn, temp, coin_selection_params, bnb_used))
         return false;

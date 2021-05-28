@@ -28,6 +28,8 @@ class CWallet;
 namespace Consensus { struct Params; };
 
 static const bool DEFAULT_PRINTPRIORITY = false;
+/** Default for -targetstakeinputs */
+static constexpr int DEFAULT_TARGET_STAKE_INPUTS = -1;
 
 struct CBlockTemplateEntry
 {
