@@ -307,7 +307,7 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
     const bool fPositive = dividend >= 0;
     const uint32_t divisor = params.nPowTargetTimespan; // Must be positive
     const int exponent = dividend / divisor; // Note: this integer division rounds down positive and rounds up negative numbers via truncation, but the truncated fractional part is handled by the approximation below
-    const uint32_t remainder = fPositive ? dividend % divisor : -dividend % divisor; // Must be positive
+    const uint32_t remainder = (fPositive ? dividend : -dividend) % divisor; // Must be positive
     // We are using uint512 rather than uint64_t here because a nPowTargetTimespan of more than 3 days in the divisor may cause the following cubic approximation to overflow a uint64_t
     arith_uint512 numerator = 1;
     arith_uint512 denominator = 1;
