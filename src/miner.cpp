@@ -600,7 +600,6 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
 
                 if (whichType == TxoutType::PUBKEY || whichType == TxoutType::PUBKEY_REPLAY || whichType == TxoutType::PUBKEY_DATA_REPLAY || whichType == TxoutType::PUBKEYHASH || whichType == TxoutType::PUBKEYHASH_REPLAY ||
                     whichType == TxoutType::WITNESS_V0_KEYHASH || whichType == TxoutType::SCRIPTHASH || whichType == TxoutType::SCRIPTHASH_REPLAY || whichType == TxoutType::WITNESS_V0_SCRIPTHASH) { // we support p2pkh, p2wpkh, p2sh-p2wpkh, and p2sh/p2wsh-multisig inputs
-                    const bool fNewStakingCodeActive = nHeight >= consensusParams.nMandatoryUpgradeBlock;
                     if (whichType == TxoutType::SCRIPTHASH || whichType == TxoutType::WITNESS_V0_SCRIPTHASH) { // a p2sh/p2wsh input could be many things, but we only support p2sh-p2wpkh and multisig for now
                         CScript subscript;
                         std::unique_ptr<SigningProvider> provider = pwallet->GetSolvingProvider(scriptPubKeyKernel);
@@ -611,7 +610,7 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                             hash = uint160(vSolutions[0]);
                         if (provider && provider->GetCScript(CScriptID(hash), subscript)) { // extract the redeem script
                             TxoutType scriptType = Solver(subscript, vSolutions);
-                            if (!fNewStakingCodeActive || (scriptType != TxoutType::WITNESS_V0_KEYHASH && scriptType != TxoutType::MULTISIG && scriptType != TxoutType::MULTISIG_REPLAY && scriptType != TxoutType::MULTISIG_DATA && scriptType != TxoutType::MULTISIG_DATA_REPLAY)) { // this is a script we don't recognize
+                            if (scriptType != TxoutType::WITNESS_V0_KEYHASH && scriptType != TxoutType::MULTISIG && scriptType != TxoutType::MULTISIG_REPLAY && scriptType != TxoutType::MULTISIG_DATA && scriptType != TxoutType::MULTISIG_DATA_REPLAY) { // this is a script we don't recognize
                                 if (gArgs.GetBoolArg("-debug", false) && gArgs.GetBoolArg("-printcoinstake", false))
                                     LogPrintf("%s : no support for %s kernel type=%s\n", __func__, GetTxnOutputType(whichType), GetTxnOutputType(scriptType));
                                 continue;
@@ -624,7 +623,7 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                         }
                     }
 
-                    if ((fNewStakingCodeActive || whichType != TxoutType::PUBKEY) && gArgs.GetBoolArg("-quantumsafestaking", false)) { // a new bech32 address is generated for every stake to protect the public key from quantum computers
+                    if (gArgs.GetBoolArg("-quantumsafestaking", false)) { // a new bech32 address is generated for every stake to protect the public key from quantum computers
                         OutputType output_type = OutputType::BECH32;
                         CTxDestination dest;
                         std::string error;
