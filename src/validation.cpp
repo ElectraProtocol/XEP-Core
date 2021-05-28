@@ -2436,10 +2436,9 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
     CAmount nExpectedBlockReward = GetBlockSubsidy(pindex->nHeight, fProofOfStake, nCoinAge, chainparams.GetConsensus());
     CAmount nTreasuryPayment = GetTreasuryPayment(pindex->nHeight, chainparams.GetConsensus());
 
-    //if (fProofOfStake) // Fees are burned on and after the first PoS block
-        nAmountBurned += nFees;
-    //else
-        //nExpectedBlockReward += nFees;
+    if (chainparams.NetworkIDString() != CBaseChainParams::MAIN) { // Half of fees are burned on and after the first PoS block
+        nExpectedBlockReward += nFees / 2;
+    }
 
     if (nTreasuryPayment > 0 && IsTreasuryBlock(pindex->nHeight, chainparams.GetConsensus())) {
         const CTransaction& txNew = fProofOfStake ? *block.vtx[1] : *block.vtx[0];
@@ -2481,7 +2480,7 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
 
     // peercoin: track money supply and mint amount info
     pindex->nMint = nActualBlockReward;
-    pindex->nMoneySupply = (pindex->pprev ? pindex->pprev->nMoneySupply : 0) + pindex->nMint - nAmountBurned;
+    pindex->nMoneySupply = (pindex->pprev ? pindex->pprev->nMoneySupply : 0) + pindex->nMint - nAmountBurned - nFees; // Fees are not added to nMoneySupply because they are already part of the circulating supply
     pindex->nTreasuryPayment = nTreasuryPayment;
     //LogPrintf("ConnectBlock(): INFO: nValueOut: %s, nValueIn: %s, nFees: %s, nMint: %s\n", FormatMoney(nValueOut), FormatMoney(nValueIn), FormatMoney(nFees), FormatMoney(pindex->nMint));
 
