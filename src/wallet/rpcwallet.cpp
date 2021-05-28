@@ -383,7 +383,7 @@ void ParseRecipients(CWallet* const pwallet, const UniValue& address_amounts, co
         CScript script_pub_key = GetScriptForDestination(dest);
         if (dest.which() == 1 /* PKHash */ || dest.which() == 2 /* ScriptHash */) {
             const int nHeight = std::max(pwallet->GetLastBlockHeight() - 100, 0);
-            if (nHeight >= 180000) {
+            if (nHeight >= 230000) {
                 script_pub_key << ToByteVector(pwallet->chain().getBlockHash(nHeight)) << nHeight << OP_CHECKBLOCKATHEIGHTVERIFY << OP_2DROP;
             }
         }

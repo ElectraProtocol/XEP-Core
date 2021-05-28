@@ -180,7 +180,7 @@ WalletModel::SendCoinsReturn WalletModel::prepareTransaction(WalletModelTransact
             CScript scriptPubKey = GetScriptForDestination(dest);
             if (m_client_model && (dest.which() == 1 /* PKHash */ || dest.which() == 2 /* ScriptHash */)) {
                 const int nHeight = std::max(m_client_model->getNumBlocks() - 100, 0);
-                if (nHeight >= 180000) {
+                if (nHeight >= 230000) {
                     std::unique_ptr<interfaces::Chain> chain = interfaces::MakeChain(*m_client_model->node().context());
                     scriptPubKey << ToByteVector(chain->getBlockHash(nHeight)) << nHeight << OP_CHECKBLOCKATHEIGHTVERIFY << OP_2DROP;
                 }
