@@ -173,10 +173,11 @@ unsigned int WeightedTargetExponentialMovingAverage(const CBlockIndex* pindexLas
     const int nInterval = nTargetTimespan / (nTargetSpacing * 2); // alpha_reciprocal = (N(SMA) + 1) / 2 for same "center of mass" as SMA
 
     // nActualSpacing must be restricted as to not produce a negative number below
-    if (nActualSpacing <= -((nInterval - 1) * nTargetSpacing))
-        nActualSpacing = -((nInterval - 1) * nTargetSpacing) + 1;
+    // The functionality of this if statement has been moved directly into the calculation of the numerator with the call to std::max
+    //if (nActualSpacing <= -((nInterval - 1) * nTargetSpacing))
+        //nActualSpacing = -((nInterval - 1) * nTargetSpacing) + 1;
 
-    const uint32_t numerator = (nInterval - 1) * nTargetSpacing + nActualSpacing;
+    const uint32_t numerator = std::max((nInterval - 1) * nTargetSpacing + nActualSpacing, 1);
     const uint32_t denominator = nInterval * nTargetSpacing;
 
     // Keep in mind the order of operations and integer division here - this is why the *= operator cannot be used, as it could cause overflow or integer division to occur
