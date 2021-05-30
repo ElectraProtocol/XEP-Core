@@ -152,11 +152,6 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     coinbaseTx.vout.resize(1);
     coinbaseTx.vout[0].scriptPubKey = scriptPubKeyIn;
 
-    if (!fProofOfStake) {
-        coinbaseTx.vout[0].nValue = /* nFees + */ GetBlockSubsidy(nHeight, false, 0, consensusParams);
-        FillTreasuryPayee(coinbaseTx, nHeight, consensusParams);
-    }
-
     // Add dummy coinbase tx as first transaction
     pblocktemplate->entries.emplace_back(CTransactionRef(), -1, -1); // updated at end
 
@@ -220,7 +215,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
         CMutableTransaction coinstakeTx;
         int64_t nSearchTime = GetAdjustedTime(); // search to current time
         if (nSearchTime > nLastCoinStakeSearchTime) {
-            if (CreateCoinStake(coinstakeTx, pblock, pwallet, nHeight, pindexPrev, consensusParams)) {
+            if (CreateCoinStake(coinstakeTx, pblock, pwallet, nFees, nHeight, pindexPrev, consensusParams)) {
                 coinbaseTx.vout[0].SetEmpty();
                 pblocktemplate->entries[1].tx = MakeTransactionRef(std::move(coinstakeTx));
                 pblock->vtx[1] = pblocktemplate->entries[1].tx;
@@ -238,6 +233,10 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     m_last_block_num_txs = nBlockTx;
     m_last_block_weight = nBlockWeight;
 
+    if (!fProofOfStake) {
+        coinbaseTx.vout[0].nValue = GetBlockSubsidy(nHeight, false, 0, consensusParams) + (chainparams.NetworkIDString() != CBaseChainParams::MAIN ? nFees / 2 : 0);
+        FillTreasuryPayee(coinbaseTx, nHeight, consensusParams);
+    }
     coinbaseTx.vin[0].scriptSig = CScript() << nHeight << OP_0;
     pblocktemplate->entries[0].tx = MakeTransactionRef(std::move(coinbaseTx));
     pblock->vtx[0] = pblocktemplate->entries[0].tx;
@@ -537,7 +536,7 @@ void IncrementExtraNonce(CBlock* pblock, const CBlockIndex* pindexPrev, unsigned
 }
 
 
-bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shared_ptr<CWallet> pwallet, const int& nHeight, const CBlockIndex* pindexPrev, const Consensus::Params& consensusParams)
+bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shared_ptr<CWallet> pwallet, const CAmount& nFees, const int& nHeight, const CBlockIndex* pindexPrev, const Consensus::Params& consensusParams)
 {
     AssertLockHeld(pwallet->cs_wallet);
 
@@ -719,7 +718,7 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                 if (!GetCoinAge((const CTransaction)coinstakeTx, view, pblock->nTime, nHeight, nCoinAge))
                     return error("%s : failed to calculate coin age", __func__);
 
-                const CAmount nReward = GetBlockSubsidy(nHeight, true, nCoinAge, consensusParams);
+                const CAmount nReward = GetBlockSubsidy(nHeight, true, nCoinAge, consensusParams) + (Params().NetworkIDString() != CBaseChainParams::MAIN ? nFees / 2 : 0);
                 // Refuse to create mint that has zero or negative reward
                 if (nReward < 0)
                     return error("%s : not creating mint with negative subsidy", __func__);
