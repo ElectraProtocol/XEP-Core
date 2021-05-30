@@ -184,7 +184,7 @@ unsigned int WeightedTargetExponentialMovingAverage(const CBlockIndex* pindexLas
     bnNew = bnNew512.trim256();
 
     if (bnNew512 > arith_uint512(bnPowLimit) || bnNew == arith_uint256())
-        bnNew = bnPowLimit;
+        return nProofOfWorkLimit;
 
     return bnNew.GetCompactRounded();
 }
@@ -360,7 +360,7 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
     //LogPrintf("denominator = %lu\n", denominator);
     //LogPrintf("10000 * 2^(%li/%u) = %s\n", dividend, divisor, arith_uint512((10000 * arith_uint512(numerator)) / arith_uint512(denominator)).trim256().ToString().c_str());
     if (bnNew512 > arith_uint512(bnPowLimit) || bnNew == arith_uint256())
-        bnNew = bnPowLimit;
+        return nProofOfWorkLimit;
 
     return bnNew.GetCompactRounded();
 }
