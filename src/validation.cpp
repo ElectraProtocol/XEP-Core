@@ -5807,7 +5807,7 @@ bool CheckBlockSignature(const CBlock& block)
         const CTxIn& txin = fProofOfStake ? block.vtx[1]->vin[0] : cbtxin;
         if (fProofOfStake && (txin.scriptSig.size() == 0 || txin.scriptSig.size() == 23) && txin.scriptWitness.stack.size() == 2 && txin.scriptWitness.stack.back().size() == CPubKey::COMPRESSED_SIZE) { // p2wpkh or p2sh-p2wpkh input
             pubkey = CPubKey(txin.scriptWitness.stack.back());
-        } else if (fProofOfStake && txin.scriptWitness.stack.size() == 0 && txin.scriptSig.size() >= 100 && txin.scriptSig.size() <= 140 && txin.scriptSig.IsPushOnly() && txin.scriptSig[0] >= 70 && txin.scriptSig[0] <= 73) { // p2pkh input (sig + pubkey)
+        } else if (fProofOfStake && txin.scriptWitness.stack.size() == 0 && txin.scriptSig.size() >= 100 && txin.scriptSig.size() <= 140 && txin.scriptSig.IsPushOnly() && txin.scriptSig[0] >= CPubKey::COMPACT_SIGNATURE_SIZE && txin.scriptSig[0] <= (CPubKey::SIGNATURE_SIZE + 1)) { // p2pkh input (sig + pubkey)
             unsigned int pubkeyStart = txin.scriptSig[0] + 2u; // skip sig and length bytes by reading sig length from pushdata
             //LogPrintf("%s : p2pkh txin.scriptSig = %s\n", __func__, HexStr(txin.scriptSig));
             //LogPrintf("%s : txin.scriptSig.size() = %u, txin.scriptSig[0] = %u, pubkeyStart = %u\n", __func__, txin.scriptSig.size(), txin.scriptSig[0], pubkeyStart);
