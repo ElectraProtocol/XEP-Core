@@ -423,7 +423,7 @@ public:
     {
         // Create a dummy signature that is a valid DER-encoding
         vchSig.assign(m_r_len + m_s_len + 7, '\000');
-        vchSig[0] = 0x30;
+        vchSig[0] = CPubKey::SigFlag::VERSION_SIG_DER;
         vchSig[1] = m_r_len + m_s_len + 4;
         vchSig[2] = 0x02;
         vchSig[3] = m_r_len;

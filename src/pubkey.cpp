@@ -36,7 +36,7 @@ int ecdsa_signature_parse_der_lax(const secp256k1_context* ctx, secp256k1_ecdsa_
     secp256k1_ecdsa_signature_parse_compact(ctx, sig, tmpsig);
 
     /* Sequence tag byte */
-    if (pos == inputlen || input[pos] != 0x30) {
+    if (pos == inputlen || input[pos] != CPubKey::SigFlag::VERSION_SIG_DER) {
         return 0;
     }
     pos++;

@@ -123,7 +123,7 @@ bool static IsValidSignatureEncoding(const std::vector<unsigned char> &sig) {
     if (sig.size() > 73) return false;
 
     // A signature is of type 0x30 (compound).
-    if (sig[0] != 0x30) return false;
+    if (sig[0] != CPubKey::SigFlag::VERSION_SIG_DER) return false;
 
     // Make sure the length covers the entire signature.
     if (sig[1] != sig.size() - 3) return false;
