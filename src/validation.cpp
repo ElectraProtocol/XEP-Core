@@ -5846,6 +5846,13 @@ bool CheckBlockSignature(const CBlock& block)
     if (!pubkey.IsCompressed())
         return error("%s : invalid pubkey %s", __func__, HexStr(pubkey));
 
-    CPubKey recoveredPubKey;
-    return (recoveredPubKey.RecoverCompact(blockHash, block.vchBlockSig) && recoveredPubKey == pubkey) || pubkey.Verify(blockHash, block.vchBlockSig);
+    if (CPubKey::GetSigType(block.vchBlockSig[0]) == CPubKey::SigType::SIG_COMPACT) {
+        CPubKey recoveredPubKey;
+        // Only compressed pubkeys are supported and RecoverCompact already checks sig size
+        return ((block.vchBlockSig[0] & 4) &&
+                recoveredPubKey.RecoverCompact(blockHash, block.vchBlockSig, CPubKey::SigFlag::VERSION_SIG_COMPACT) &&
+                recoveredPubKey == pubkey);
+    } else {
+        return pubkey.Verify(blockHash, block.vchBlockSig);
+    }
 }
