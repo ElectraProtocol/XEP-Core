@@ -206,11 +206,11 @@ bool CPubKey::Verify(const uint256 &hash, const std::vector<unsigned char>& vchS
     return secp256k1_ecdsa_verify(secp256k1_context_verify, &sig, hash.begin(), &pubkey);
 }
 
-bool CPubKey::RecoverCompact(const uint256 &hash, const std::vector<unsigned char>& vchSig) {
-    if (vchSig.size() != COMPACT_SIGNATURE_SIZE)
+bool CPubKey::RecoverCompact(const uint256 &hash, const std::vector<unsigned char>& vchSig, unsigned char header) {
+    if (vchSig.size() != COMPACT_SIGNATURE_SIZE || header > vchSig[0])
         return false;
-    int recid = (vchSig[0] - 27) & 3;
-    bool fComp = ((vchSig[0] - 27) & 4) != 0;
+    int recid = (vchSig[0] - header) & 3;
+    bool fComp = ((vchSig[0] - header) & 4) != 0;
     secp256k1_pubkey pubkey;
     secp256k1_ecdsa_recoverable_signature sig;
     assert(secp256k1_context_verify && "secp256k1_context_verify must be initialized to use CPubKey.");

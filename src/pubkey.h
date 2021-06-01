@@ -198,7 +198,7 @@ public:
     static bool CheckLowS(const std::vector<unsigned char>& vchSig);
 
     //! Recover a public key from a compact signature.
-    bool RecoverCompact(const uint256& hash, const std::vector<unsigned char>& vchSig);
+    bool RecoverCompact(const uint256& hash, const std::vector<unsigned char>& vchSig, unsigned char header = 27);
 
     //! Turn this public key into an uncompressed public key.
     bool Decompress();
