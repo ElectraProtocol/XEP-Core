@@ -384,7 +384,12 @@ void ParseRecipients(CWallet* const pwallet, const UniValue& address_amounts, co
         if (dest.which() == 1 /* PKHash */ || dest.which() == 2 /* ScriptHash */) {
             const int nHeight = std::max(pwallet->GetLastBlockHeight() - 100, 0);
             if (nHeight >= 230000) {
-                script_pub_key << ToByteVector(pwallet->chain().getBlockHash(nHeight)) << nHeight << OP_CHECKBLOCKATHEIGHTVERIFY << OP_2DROP;
+                // Trim the most significant bytes of the block hash to reduce it from 32 to 20 bytes while still maintaining good collision resistance
+                const uint256& blockHash = pwallet->chain().getBlockHash(nHeight);
+                std::vector<unsigned char> vchBlockHash(blockHash.begin(), blockHash.end());
+                vchBlockHash.erase(vchBlockHash.begin() + 20, vchBlockHash.end());
+
+                script_pub_key << vchBlockHash << nHeight << OP_CHECKBLOCKATHEIGHTVERIFY << OP_2DROP;
             }
         }
         CAmount amount = AmountFromValue(address_amounts[i++]);

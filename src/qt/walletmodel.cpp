@@ -182,7 +182,13 @@ WalletModel::SendCoinsReturn WalletModel::prepareTransaction(WalletModelTransact
                 const int nHeight = std::max(m_client_model->getNumBlocks() - 100, 0);
                 if (nHeight >= 230000) {
                     std::unique_ptr<interfaces::Chain> chain = interfaces::MakeChain(*m_client_model->node().context());
-                    scriptPubKey << ToByteVector(chain->getBlockHash(nHeight)) << nHeight << OP_CHECKBLOCKATHEIGHTVERIFY << OP_2DROP;
+
+                    // Trim the most significant bytes of the block hash to reduce it from 32 to 20 bytes while still maintaining good collision resistance
+                    const uint256& blockHash = chain->getBlockHash(nHeight);
+                    std::vector<unsigned char> vchBlockHash(blockHash.begin(), blockHash.end());
+                    vchBlockHash.erase(vchBlockHash.begin() + 20, vchBlockHash.end());
+
+                    scriptPubKey << vchBlockHash << nHeight << OP_CHECKBLOCKATHEIGHTVERIFY << OP_2DROP;
                 }
             }
             CRecipient recipient = {scriptPubKey, rcp.amount, rcp.fSubtractFeeFromAmount};
