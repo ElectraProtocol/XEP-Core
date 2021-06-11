@@ -53,7 +53,7 @@ public:
     };
 
     enum SigFlag {
-        VERSION_SIG_COMPACT = 0,
+        VERSION_SIG_COMPACT = 1<<3, // must be greater than zero to avoid being interpreted as an uncompressed public key
         VERSION_SIG_DER = 6<<3,
         VERSION_SIG_MASK = 31<<3
     };
