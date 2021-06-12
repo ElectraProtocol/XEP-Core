@@ -13,7 +13,7 @@ the XEP Core software, see https://www.electraprotocol.com/, or read the
 <tr> <td>Ticker</td><td>XEP</td></tr>
 <tr> <td>Algorithm</td><td>SHA-256</td></tr>
 <tr> <td>Consensus</td><td>Proof-of-Stake 3.0e</td></tr>
-<tr> <td>Circulating supply</td><td>https://electraprotocol.network/</td></tr>
+<tr> <td>Circulating supply</td><td>https://explorer.electraprotocol.network/</td></tr>
 <tr> <td>Block Time</td><td>80 Seconds</td></tr>
 <tr> <td>Block Size</td><td>10 MB (Dynamic)</td></tr>
 <tr> <td>Staking Reward</td><td>3% yearly</td></tr>
