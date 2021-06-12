@@ -746,7 +746,7 @@ void SendCoinsDialog::updateCoinControlState(CCoinControl& ctrl)
     ctrl.fAllowWatchOnly = model->wallet().privateKeysDisabled();
 }
 
-void SendCoinsDialog::updateNumberOfBlocks(int count, const QDateTime& blockDate, double nVerificationProgress, bool headers, SynchronizationState sync_state) {
+void SendCoinsDialog::updateNumberOfBlocks(int count, const QDateTime& blockDate, const QString& blockHash, double nVerificationProgress, bool headers, SynchronizationState sync_state) {
     if (sync_state == SynchronizationState::POST_INIT) {
         updateSmartFeeLabel();
     }
