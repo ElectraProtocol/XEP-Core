@@ -726,7 +726,7 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                 if (nTargetStakeInputs > 0) {
                     outputs = std::max(int(coinstakeTx.vin.size()) + nTargetStakeInputs - nTotalInputs, 1);
                 } else if (nTargetStakeInputs == 0) {
-                    outputs = std::max(nCredit / nAutomaticInputSize, 1l);
+                    outputs = std::max(nCredit / nAutomaticInputSize, static_cast<int64_t>(1));
                 }
                 for (unsigned int i = 0; i < outputs; i++) {
                     coinstakeTx.vout.push_back(CTxOut(nCredit / outputs, scriptPubKeyOut));
