@@ -43,6 +43,7 @@
 #include <QApplication>
 #include <QComboBox>
 #include <QDateTime>
+#include <QDesktopServices>
 #include <QDragEnterEvent>
 #include <QListWidget>
 #include <QMenu>
@@ -389,6 +390,31 @@ void XEPGUI::createActions()
     // prevents an open debug window from becoming stuck/unusable on client shutdown
     connect(quitAction, &QAction::triggered, rpcConsole, &QWidget::hide);
 
+    websiteLinkAction = new QAction(tr("Website"), this);
+    websiteLinkAction->setStatusTip("https://www.electraprotocol.com/");
+
+    githubLinkAction = new QAction(tr("GitHub"), this);
+    githubLinkAction->setStatusTip("https://github.com/ElectraProtocol/XEP-Core");
+
+    explorerOneAction = new QAction(tr("Explorer 1"), this);
+    explorerOneAction->setStatusTip("https://explorer.electraprotocol.network/");
+
+    explorerTwoAction = new QAction(tr("Explorer 2"), this);
+    explorerTwoAction->setStatusTip("https://electraprotocol.network/");
+
+    cmcLinkAction = new QAction(tr("CoinMarketCap"), this);
+    cmcLinkAction->setStatusTip("https://coinmarketcap.com/currencies/electra-protocol/");
+
+    coingeckoLinkAction = new QAction(tr("CoinGecko"), this);
+    coingeckoLinkAction->setStatusTip("https://www.coingecko.com/en/coins/electra-protocol");
+
+    connect(websiteLinkAction, &QAction::triggered, [this]{ QDesktopServices::openUrl(QUrl("https://www.electraprotocol.com/")); });
+    connect(githubLinkAction, &QAction::triggered, [this]{ QDesktopServices::openUrl(QUrl("https://github.com/ElectraProtocol/XEP-Core")); });
+    connect(explorerOneAction, &QAction::triggered, [this]{ QDesktopServices::openUrl(QUrl("https://explorer.electraprotocol.network/")); });
+    connect(explorerTwoAction, &QAction::triggered, [this]{ QDesktopServices::openUrl(QUrl("https://electraprotocol.network/")); });
+    connect(cmcLinkAction, &QAction::triggered, [this]{ QDesktopServices::openUrl(QUrl("https://coinmarketcap.com/currencies/electra-protocol/")); });
+    connect(coingeckoLinkAction, &QAction::triggered, [this]{ QDesktopServices::openUrl(QUrl("https://www.coingecko.com/en/coins/electra-protocol")); });
+
 #ifdef ENABLE_WALLET
     if(walletFrame)
     {
@@ -553,6 +579,16 @@ void XEPGUI::createMenuBar()
             showDebugWindow();
         });
     }
+
+    QMenu* links_menu = appMenuBar->addMenu(tr("&Links"));
+    links_menu->addAction(websiteLinkAction);
+    links_menu->addAction(githubLinkAction);
+    links_menu->addSeparator();
+    links_menu->addAction(explorerOneAction);
+    links_menu->addAction(explorerTwoAction);
+    links_menu->addSeparator();
+    links_menu->addAction(cmcLinkAction);
+    links_menu->addAction(coingeckoLinkAction);
 
     QMenu *help = appMenuBar->addMenu(tr("&Help"));
     help->addAction(showHelpMessageAction);

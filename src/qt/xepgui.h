@@ -169,6 +169,14 @@ private:
     QAction* m_mask_values_action{nullptr};
     QAction* m_hide_orphans_action{nullptr};
 
+    // Links menu
+    QAction* websiteLinkAction = nullptr;
+    QAction* explorerOneAction = nullptr;
+    QAction* explorerTwoAction = nullptr;
+    QAction* githubLinkAction = nullptr;
+    QAction* cmcLinkAction = nullptr;
+    QAction* coingeckoLinkAction = nullptr;
+
     QLabel *m_wallet_selector_label = nullptr;
     QComboBox* m_wallet_selector = nullptr;
 
