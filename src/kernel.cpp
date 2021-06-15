@@ -411,7 +411,7 @@ uint256 stakeHash(const unsigned int& nTimeTx, CDataStream& ss, const unsigned i
 
 static inline unsigned int CalculateTimeWeight(const unsigned int& nTimeTx, const unsigned int& nTimeBlockFrom, const int64_t& nStakeMinAge, const int64_t& nStakeMaxAge, const int64_t& nMinTimeWeight)
 {
-    int64_t nTimeDiff = std::max(nTimeTx - nTimeBlockFrom - nStakeMinAge, 0l);
+    int64_t nTimeDiff = std::max(nTimeTx - nTimeBlockFrom - nStakeMinAge, static_cast<int64_t>(0));
     // Time weight grows to a maximum of (nStakeMaxAge + nMinTimeWeight) / 2 and then decreases to a minimum of (nMinTimeWeight + nStakeMinAge) in order to
     // incentivize active staking because the likelihood of staking will begin to decrease past ((nStakeMaxAge + nMinTimeWeight) / 2) + nStakeMinAge in days
     unsigned int nTimeWeight = std::min(nTimeDiff, std::max(nStakeMaxAge + nMinTimeWeight - nTimeDiff, nMinTimeWeight + nStakeMinAge));
