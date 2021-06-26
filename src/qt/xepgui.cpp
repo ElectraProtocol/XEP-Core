@@ -4,6 +4,7 @@
 
 #include <qt/xepgui.h>
 
+#include <qt/applocker.h>
 #include <qt/xepunits.h>
 #include <qt/clientmodel.h>
 #include <qt/createwalletdialog.h>
@@ -98,6 +99,7 @@ XEPGUI::XEPGUI(interfaces::Node& node, const PlatformStyle *_platformStyle, cons
     rpcConsole = new RPCConsole(node, _platformStyle, nullptr);
     helpMessageDialog = new HelpMessageDialog(this, false);
     updateWalletDialog = new UpdateWalletDialog(this);
+    appLocker = new AppLocker(nullptr);
 #ifdef ENABLE_WALLET
     if(enableWallet)
     {
@@ -207,6 +209,9 @@ XEPGUI::XEPGUI(interfaces::Node& node, const PlatformStyle *_platformStyle, cons
 
     connect(labelBlocksIcon, &GUIUtil::ClickableLabel::clicked, this, &XEPGUI::showModalOverlay);
     connect(progressBar, &GUIUtil::ClickableProgressBar::clicked, this, &XEPGUI::showModalOverlay);
+
+    connect(appLocker, &AppLocker::quitAppFromWalletLocker, quitAction, &QAction::trigger);
+    connect(appLocker, &AppLocker::lockingApp, this, &XEPGUI::setPrivacy);
 #ifdef ENABLE_WALLET
     if(enableWallet) {
         connect(walletFrame, &WalletFrame::requestedSyncWarningInfo, this, &XEPGUI::showModalOverlay);
@@ -238,6 +243,7 @@ XEPGUI::~XEPGUI()
 #endif
 
     delete rpcConsole;
+    delete appLocker;
 }
 
 void XEPGUI::createActions()
@@ -322,6 +328,8 @@ void XEPGUI::createActions()
     unlockWalletAction = new QAction(tr("&Unlock Wallet..."), this);
     unlockWalletAction->setToolTip(tr("Unlock wallet"));
     lockWalletAction = new QAction(tr("Lock Wallet"), this);
+    appLockerAction = new QAction(tr("Lock application"), this);
+    appLockerAction->setStatusTip(tr("Lock access to the wallet application"));
     backupWalletAction = new QAction(tr("&Backup Wallet..."), this);
     backupWalletAction->setStatusTip(tr("Backup wallet to another location"));
     changePassphraseAction = new QAction(tr("&Change Passphrase..."), this);
@@ -387,8 +395,9 @@ void XEPGUI::createActions()
     connect(toggleHideAction, &QAction::triggered, this, &XEPGUI::toggleHidden);
     connect(showHelpMessageAction, &QAction::triggered, this, &XEPGUI::showHelpMessageClicked);
     connect(openRPCConsoleAction, &QAction::triggered, this, &XEPGUI::showDebugWindow);
-    // prevents an open debug window from becoming stuck/unusable on client shutdown
+    // prevents an open debug or appLocker window from becoming stuck/unusable on client shutdown
     connect(quitAction, &QAction::triggered, rpcConsole, &QWidget::hide);
+    connect(quitAction, &QAction::triggered, appLocker, &QWidget::close);
 
     websiteLinkAction = new QAction(tr("Website"), this);
     websiteLinkAction->setStatusTip("https://www.electraprotocol.com/");
@@ -421,6 +430,7 @@ void XEPGUI::createActions()
         connect(encryptWalletAction, &QAction::triggered, walletFrame, &WalletFrame::encryptWallet);
         connect(unlockWalletAction, &QAction::triggered, walletFrame, &WalletFrame::unlockWallet);
         connect(lockWalletAction, &QAction::triggered, walletFrame, &WalletFrame::lockWallet);
+        connect(appLockerAction, &QAction::triggered, appLocker, &AppLocker::showLocker);
         connect(backupWalletAction, &QAction::triggered, walletFrame, &WalletFrame::backupWallet);
         connect(changePassphraseAction, &QAction::triggered, walletFrame, &WalletFrame::changePassphrase);
         connect(signMessageAction, &QAction::triggered, [this]{ showNormalIfMinimized(); });
@@ -565,6 +575,8 @@ void XEPGUI::createMenuBar()
             GUIUtil::bringToFront(this);
         });
 #endif
+        window_menu->addSeparator();
+        window_menu->addAction(appLockerAction);
         window_menu->addSeparator();
         window_menu->addAction(usedSendingAddressesAction);
         window_menu->addAction(usedReceivingAddressesAction);
@@ -893,8 +905,10 @@ void XEPGUI::aboutClicked()
 
 void XEPGUI::showDebugWindow()
 {
-    GUIUtil::bringToFront(rpcConsole);
-    Q_EMIT consoleShown(rpcConsole);
+    if (!appLocker->isWalletLocked()) {
+        GUIUtil::bringToFront(rpcConsole);
+        Q_EMIT consoleShown(rpcConsole);
+    }
 }
 
 void XEPGUI::showDebugWindowActivateConsole()
@@ -932,25 +946,34 @@ void XEPGUI::gotoHistoryPage()
 
 void XEPGUI::gotoReceiveCoinsPage()
 {
-    receiveCoinsAction->setChecked(true);
-    if (walletFrame) walletFrame->gotoReceiveCoinsPage();
+    if (!appLocker->isWalletLocked()) {
+        receiveCoinsAction->setChecked(true);
+        if (walletFrame) walletFrame->gotoReceiveCoinsPage();
+    }
 }
 
 void XEPGUI::gotoSendCoinsPage(QString addr)
 {
-    sendCoinsAction->setChecked(true);
-    if (walletFrame) walletFrame->gotoSendCoinsPage(addr);
+    if (!appLocker->isWalletLocked()) {
+        sendCoinsAction->setChecked(true);
+        if (walletFrame) walletFrame->gotoSendCoinsPage(addr);
+    }
 }
 
 void XEPGUI::gotoSignMessageTab(QString addr)
 {
-    if (walletFrame) walletFrame->gotoSignMessageTab(addr);
+    if (!appLocker->isWalletLocked()) {
+        if (walletFrame) walletFrame->gotoSignMessageTab(addr);
+    }
 }
 
 void XEPGUI::gotoVerifyMessageTab(QString addr)
 {
-    if (walletFrame) walletFrame->gotoVerifyMessageTab(addr);
+    if (!appLocker->isWalletLocked()) {
+        if (walletFrame) walletFrame->gotoVerifyMessageTab(addr);
+    }
 }
+
 void XEPGUI::gotoLoadPSBT(bool from_clipboard)
 {
     if (walletFrame) walletFrame->gotoLoadPSBT(from_clipboard);
@@ -1007,13 +1030,15 @@ void XEPGUI::updateHeadersSyncProgressLabel()
 
 void XEPGUI::openOptionsDialogWithTab(OptionsDialog::Tab tab)
 {
-    if (!clientModel || !clientModel->getOptionsModel())
-        return;
+    if (!appLocker->isWalletLocked()) {
+        if (!clientModel || !clientModel->getOptionsModel())
+            return;
 
-    OptionsDialog dlg(this, enableWallet);
-    dlg.setCurrentTab(tab);
-    dlg.setModel(clientModel->getOptionsModel());
-    dlg.exec();
+        OptionsDialog dlg(this, enableWallet);
+        dlg.setCurrentTab(tab);
+        dlg.setModel(clientModel->getOptionsModel());
+        dlg.exec();
+    }
 }
 
 void XEPGUI::setNumBlocks(int count, const QDateTime& blockDate, const QString& blockHash, double nVerificationProgress, bool header, SynchronizationState sync_state)
@@ -1431,6 +1456,12 @@ void XEPGUI::detectShutdown()
     {
         if(rpcConsole)
             rpcConsole->hide();
+        if (appLocker) {
+            if (appLocker->isWalletLocked()) {
+                appLocker->forceShutdown();
+            }
+            appLocker->close();
+        }
         qApp->quit();
     }
 }

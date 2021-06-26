@@ -39,6 +39,7 @@ class WalletModel;
 class HelpMessageDialog;
 class UpdateWalletDialog;
 class ModalOverlay;
+class AppLocker;
 enum class SynchronizationState;
 
 namespace interfaces {
@@ -121,6 +122,7 @@ private:
     std::unique_ptr<interfaces::Handler> m_handler_question;
     ClientModel* clientModel = nullptr;
     WalletFrame* walletFrame = nullptr;
+    AppLocker* appLocker = nullptr;
 
     UnitDisplayStatusBarControl* unitDisplayControl = nullptr;
     QLabel* labelWalletEncryptionIcon = nullptr;
@@ -153,6 +155,7 @@ private:
     QAction* encryptWalletAction = nullptr;
     QAction* unlockWalletAction = nullptr;
     QAction* lockWalletAction = nullptr;
+    QAction* appLockerAction = nullptr;
     QAction* backupWalletAction = nullptr;
     QAction* changePassphraseAction = nullptr;
     QAction* aboutQtAction = nullptr;
