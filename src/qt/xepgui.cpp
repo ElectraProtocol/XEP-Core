@@ -4,6 +4,7 @@
 
 #include <qt/xepgui.h>
 
+#include <qt/applocker.h>
 #include <qt/xepunits.h>
 #include <qt/clientmodel.h>
 #include <qt/createwalletdialog.h>
@@ -43,6 +44,7 @@
 #include <QApplication>
 #include <QComboBox>
 #include <QDateTime>
+#include <QDesktopServices>
 #include <QDragEnterEvent>
 #include <QListWidget>
 #include <QMenu>
@@ -97,6 +99,7 @@ XEPGUI::XEPGUI(interfaces::Node& node, const PlatformStyle *_platformStyle, cons
     rpcConsole = new RPCConsole(node, _platformStyle, nullptr);
     helpMessageDialog = new HelpMessageDialog(this, false);
     updateWalletDialog = new UpdateWalletDialog(this);
+    appLocker = new AppLocker(nullptr);
 #ifdef ENABLE_WALLET
     if(enableWallet)
     {
@@ -206,6 +209,9 @@ XEPGUI::XEPGUI(interfaces::Node& node, const PlatformStyle *_platformStyle, cons
 
     connect(labelBlocksIcon, &GUIUtil::ClickableLabel::clicked, this, &XEPGUI::showModalOverlay);
     connect(progressBar, &GUIUtil::ClickableProgressBar::clicked, this, &XEPGUI::showModalOverlay);
+
+    connect(appLocker, &AppLocker::quitAppFromWalletLocker, quitAction, &QAction::trigger);
+    connect(appLocker, &AppLocker::lockingApp, this, &XEPGUI::setPrivacy);
 #ifdef ENABLE_WALLET
     if(enableWallet) {
         connect(walletFrame, &WalletFrame::requestedSyncWarningInfo, this, &XEPGUI::showModalOverlay);
@@ -237,6 +243,7 @@ XEPGUI::~XEPGUI()
 #endif
 
     delete rpcConsole;
+    delete appLocker;
 }
 
 void XEPGUI::createActions()
@@ -321,6 +328,8 @@ void XEPGUI::createActions()
     unlockWalletAction = new QAction(tr("&Unlock Wallet..."), this);
     unlockWalletAction->setToolTip(tr("Unlock wallet"));
     lockWalletAction = new QAction(tr("Lock Wallet"), this);
+    appLockerAction = new QAction(tr("Lock application"), this);
+    appLockerAction->setStatusTip(tr("Lock access to the wallet application"));
     backupWalletAction = new QAction(tr("&Backup Wallet..."), this);
     backupWalletAction->setStatusTip(tr("Backup wallet to another location"));
     changePassphraseAction = new QAction(tr("&Change Passphrase..."), this);
@@ -386,8 +395,34 @@ void XEPGUI::createActions()
     connect(toggleHideAction, &QAction::triggered, this, &XEPGUI::toggleHidden);
     connect(showHelpMessageAction, &QAction::triggered, this, &XEPGUI::showHelpMessageClicked);
     connect(openRPCConsoleAction, &QAction::triggered, this, &XEPGUI::showDebugWindow);
-    // prevents an open debug window from becoming stuck/unusable on client shutdown
+    // prevents an open debug or appLocker window from becoming stuck/unusable on client shutdown
     connect(quitAction, &QAction::triggered, rpcConsole, &QWidget::hide);
+    connect(quitAction, &QAction::triggered, appLocker, &QWidget::close);
+
+    websiteLinkAction = new QAction(tr("Website"), this);
+    websiteLinkAction->setStatusTip("https://www.electraprotocol.com/");
+
+    githubLinkAction = new QAction(tr("GitHub"), this);
+    githubLinkAction->setStatusTip("https://github.com/ElectraProtocol/XEP-Core");
+
+    explorerOneAction = new QAction(tr("Explorer 1"), this);
+    explorerOneAction->setStatusTip("https://explorer.electraprotocol.network/");
+
+    explorerTwoAction = new QAction(tr("Explorer 2"), this);
+    explorerTwoAction->setStatusTip("https://electraprotocol.network/");
+
+    cmcLinkAction = new QAction(tr("CoinMarketCap"), this);
+    cmcLinkAction->setStatusTip("https://coinmarketcap.com/currencies/electra-protocol/");
+
+    coingeckoLinkAction = new QAction(tr("CoinGecko"), this);
+    coingeckoLinkAction->setStatusTip("https://www.coingecko.com/en/coins/electra-protocol");
+
+    connect(websiteLinkAction, &QAction::triggered, [this]{ QDesktopServices::openUrl(QUrl("https://www.electraprotocol.com/")); });
+    connect(githubLinkAction, &QAction::triggered, [this]{ QDesktopServices::openUrl(QUrl("https://github.com/ElectraProtocol/XEP-Core")); });
+    connect(explorerOneAction, &QAction::triggered, [this]{ QDesktopServices::openUrl(QUrl("https://explorer.electraprotocol.network/")); });
+    connect(explorerTwoAction, &QAction::triggered, [this]{ QDesktopServices::openUrl(QUrl("https://electraprotocol.network/")); });
+    connect(cmcLinkAction, &QAction::triggered, [this]{ QDesktopServices::openUrl(QUrl("https://coinmarketcap.com/currencies/electra-protocol/")); });
+    connect(coingeckoLinkAction, &QAction::triggered, [this]{ QDesktopServices::openUrl(QUrl("https://www.coingecko.com/en/coins/electra-protocol")); });
 
 #ifdef ENABLE_WALLET
     if(walletFrame)
@@ -395,6 +430,7 @@ void XEPGUI::createActions()
         connect(encryptWalletAction, &QAction::triggered, walletFrame, &WalletFrame::encryptWallet);
         connect(unlockWalletAction, &QAction::triggered, walletFrame, &WalletFrame::unlockWallet);
         connect(lockWalletAction, &QAction::triggered, walletFrame, &WalletFrame::lockWallet);
+        connect(appLockerAction, &QAction::triggered, appLocker, &AppLocker::showLocker);
         connect(backupWalletAction, &QAction::triggered, walletFrame, &WalletFrame::backupWallet);
         connect(changePassphraseAction, &QAction::triggered, walletFrame, &WalletFrame::changePassphrase);
         connect(signMessageAction, &QAction::triggered, [this]{ showNormalIfMinimized(); });
@@ -540,6 +576,8 @@ void XEPGUI::createMenuBar()
         });
 #endif
         window_menu->addSeparator();
+        window_menu->addAction(appLockerAction);
+        window_menu->addSeparator();
         window_menu->addAction(usedSendingAddressesAction);
         window_menu->addAction(usedReceivingAddressesAction);
     }
@@ -553,6 +591,16 @@ void XEPGUI::createMenuBar()
             showDebugWindow();
         });
     }
+
+    QMenu* links_menu = appMenuBar->addMenu(tr("&Links"));
+    links_menu->addAction(websiteLinkAction);
+    links_menu->addAction(githubLinkAction);
+    links_menu->addSeparator();
+    links_menu->addAction(explorerOneAction);
+    links_menu->addAction(explorerTwoAction);
+    links_menu->addSeparator();
+    links_menu->addAction(cmcLinkAction);
+    links_menu->addAction(coingeckoLinkAction);
 
     QMenu *help = appMenuBar->addMenu(tr("&Help"));
     help->addAction(showHelpMessageAction);
@@ -613,7 +661,7 @@ void XEPGUI::setClientModel(ClientModel *_clientModel, interfaces::BlockAndHeade
         connect(_clientModel, &ClientModel::networkActiveChanged, this, &XEPGUI::setNetworkActive);
 
         modalOverlay->setKnownBestHeight(tip_info->header_height, QDateTime::fromTime_t(tip_info->header_time));
-        setNumBlocks(tip_info->block_height, QDateTime::fromTime_t(tip_info->block_time), tip_info->verification_progress, false, SynchronizationState::INIT_DOWNLOAD);
+        setNumBlocks(tip_info->block_height, QDateTime::fromTime_t(tip_info->block_time), QString(), tip_info->verification_progress, false, SynchronizationState::INIT_DOWNLOAD);
         connect(_clientModel, &ClientModel::numBlocksChanged, this, &XEPGUI::setNumBlocks);
 
         // Receive and report messages from client model
@@ -857,8 +905,10 @@ void XEPGUI::aboutClicked()
 
 void XEPGUI::showDebugWindow()
 {
-    GUIUtil::bringToFront(rpcConsole);
-    Q_EMIT consoleShown(rpcConsole);
+    if (!appLocker->isWalletLocked()) {
+        GUIUtil::bringToFront(rpcConsole);
+        Q_EMIT consoleShown(rpcConsole);
+    }
 }
 
 void XEPGUI::showDebugWindowActivateConsole()
@@ -869,7 +919,7 @@ void XEPGUI::showDebugWindowActivateConsole()
 
 void XEPGUI::showHelpMessageClicked()
 {
-    helpMessageDialog->show();
+    GUIUtil::bringToFront(helpMessageDialog);
 }
 
 #ifdef ENABLE_WALLET
@@ -896,25 +946,34 @@ void XEPGUI::gotoHistoryPage()
 
 void XEPGUI::gotoReceiveCoinsPage()
 {
-    receiveCoinsAction->setChecked(true);
-    if (walletFrame) walletFrame->gotoReceiveCoinsPage();
+    if (!appLocker->isWalletLocked()) {
+        receiveCoinsAction->setChecked(true);
+        if (walletFrame) walletFrame->gotoReceiveCoinsPage();
+    }
 }
 
 void XEPGUI::gotoSendCoinsPage(QString addr)
 {
-    sendCoinsAction->setChecked(true);
-    if (walletFrame) walletFrame->gotoSendCoinsPage(addr);
+    if (!appLocker->isWalletLocked()) {
+        sendCoinsAction->setChecked(true);
+        if (walletFrame) walletFrame->gotoSendCoinsPage(addr);
+    }
 }
 
 void XEPGUI::gotoSignMessageTab(QString addr)
 {
-    if (walletFrame) walletFrame->gotoSignMessageTab(addr);
+    if (!appLocker->isWalletLocked()) {
+        if (walletFrame) walletFrame->gotoSignMessageTab(addr);
+    }
 }
 
 void XEPGUI::gotoVerifyMessageTab(QString addr)
 {
-    if (walletFrame) walletFrame->gotoVerifyMessageTab(addr);
+    if (!appLocker->isWalletLocked()) {
+        if (walletFrame) walletFrame->gotoVerifyMessageTab(addr);
+    }
 }
+
 void XEPGUI::gotoLoadPSBT(bool from_clipboard)
 {
     if (walletFrame) walletFrame->gotoLoadPSBT(from_clipboard);
@@ -971,16 +1030,18 @@ void XEPGUI::updateHeadersSyncProgressLabel()
 
 void XEPGUI::openOptionsDialogWithTab(OptionsDialog::Tab tab)
 {
-    if (!clientModel || !clientModel->getOptionsModel())
-        return;
+    if (!appLocker->isWalletLocked()) {
+        if (!clientModel || !clientModel->getOptionsModel())
+            return;
 
-    OptionsDialog dlg(this, enableWallet);
-    dlg.setCurrentTab(tab);
-    dlg.setModel(clientModel->getOptionsModel());
-    dlg.exec();
+        OptionsDialog dlg(this, enableWallet);
+        dlg.setCurrentTab(tab);
+        dlg.setModel(clientModel->getOptionsModel());
+        dlg.exec();
+    }
 }
 
-void XEPGUI::setNumBlocks(int count, const QDateTime& blockDate, double nVerificationProgress, bool header, SynchronizationState sync_state)
+void XEPGUI::setNumBlocks(int count, const QDateTime& blockDate, const QString& blockHash, double nVerificationProgress, bool header, SynchronizationState sync_state)
 {
 // Disabling macOS App Nap on initial sync, disk and reindex operations.
 #ifdef Q_OS_MAC
@@ -1298,6 +1359,7 @@ void XEPGUI::setEncryptionStatus(int status)
         encryptWalletAction->setEnabled(true);
         break;
     case WalletModel::Unlocked:
+    case WalletModel::UnlockedAskingForPassword:
         labelWalletEncryptionIcon->show();
         labelWalletEncryptionIcon->setPixmap(platformStyle->SingleColorIcon(":/icons/lock_open").pixmap(STATUSBAR_ICONSIZE,STATUSBAR_ICONSIZE));
         labelWalletEncryptionIcon->setToolTip(tr("Wallet is <b>encrypted</b> and currently <b>unlocked</b>"));
@@ -1394,6 +1456,12 @@ void XEPGUI::detectShutdown()
     {
         if(rpcConsole)
             rpcConsole->hide();
+        if (appLocker) {
+            if (appLocker->isWalletLocked()) {
+                appLocker->forceShutdown();
+            }
+            appLocker->close();
+        }
         qApp->quit();
     }
 }

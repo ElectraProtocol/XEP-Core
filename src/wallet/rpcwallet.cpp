@@ -119,7 +119,7 @@ std::shared_ptr<CWallet> GetWalletForJSONRPCRequest(const JSONRPCRequest& reques
 
 void EnsureWalletIsUnlocked(const CWallet* pwallet)
 {
-    if (pwallet->IsLocked()) {
+    if (pwallet->IsLocked() || pwallet->IsUnlockedAskingForPassword()) {
         throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Please enter the wallet passphrase with walletpassphrase first.");
     }
 }
@@ -366,7 +366,7 @@ static RPCHelpMan setlabel()
     };
 }
 
-void ParseRecipients(const UniValue& address_amounts, const UniValue& subtract_fee_outputs, std::vector<CRecipient> &recipients) {
+void ParseRecipients(CWallet* const pwallet, const UniValue& address_amounts, const UniValue& subtract_fee_outputs, std::vector<CRecipient> &recipients) {
     std::set<CTxDestination> destinations;
     int i = 0;
     for (const std::string& address: address_amounts.getKeys()) {
@@ -381,6 +381,17 @@ void ParseRecipients(const UniValue& address_amounts, const UniValue& subtract_f
         destinations.insert(dest);
 
         CScript script_pub_key = GetScriptForDestination(dest);
+        if (dest.which() == 1 /* PKHash */ || dest.which() == 2 /* ScriptHash */) {
+            const int nHeight = std::max(pwallet->GetLastBlockHeight() - 100, 0);
+            if (nHeight >= 230000) {
+                // Trim the most significant bytes of the block hash to reduce it from 32 to 20 bytes while still maintaining good collision resistance
+                const uint256& blockHash = pwallet->chain().getBlockHash(nHeight);
+                std::vector<unsigned char> vchBlockHash(blockHash.begin(), blockHash.end());
+                vchBlockHash.erase(vchBlockHash.begin() + 20, vchBlockHash.end());
+
+                script_pub_key << vchBlockHash << nHeight << OP_CHECKBLOCKATHEIGHTVERIFY << OP_2DROP;
+            }
+        }
         CAmount amount = AmountFromValue(address_amounts[i++]);
 
         bool subtract_fee = false;
@@ -400,6 +411,12 @@ UniValue SendMoney(CWallet* const pwallet, const CCoinControl &coin_control, std
 {
     EnsureWalletIsUnlocked(pwallet);
 
+    // This function is only used by sendtoaddress and sendmany.
+    // This should always try to sign, if we don't have private keys, don't try to do anything here.
+    if (pwallet->IsWalletFlagSet(WALLET_FLAG_DISABLE_PRIVATE_KEYS)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Error: Private keys are disabled for this wallet");
+    }
+
     // Shuffle recipient list
     std::shuffle(recipients.begin(), recipients.end(), FastRandomContext());
 
@@ -409,7 +426,7 @@ UniValue SendMoney(CWallet* const pwallet, const CCoinControl &coin_control, std
     bilingual_str error;
     CTransactionRef tx;
     FeeCalculation fee_calc_out;
-    bool fCreated = pwallet->CreateTransaction(recipients, tx, nFeeRequired, nChangePosRet, error, coin_control, fee_calc_out, !pwallet->IsWalletFlagSet(WALLET_FLAG_DISABLE_PRIVATE_KEYS));
+    const bool fCreated = pwallet->CreateTransaction(recipients, tx, nFeeRequired, nChangePosRet, error, coin_control, fee_calc_out, true);
     if (!fCreated) {
         throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, error.original);
     }
@@ -518,7 +535,7 @@ static RPCHelpMan sendtoaddress()
     }
 
     std::vector<CRecipient> recipients;
-    ParseRecipients(address_amounts, subtractFeeFromAmount, recipients);
+    ParseRecipients(pwallet, address_amounts, subtractFeeFromAmount, recipients);
     const bool verbose{request.params[10].isNull() ? false : request.params[10].get_bool()};
 
     return SendMoney(pwallet, coin_control, recipients, mapValue, verbose);
@@ -1030,7 +1047,7 @@ static RPCHelpMan sendmany()
     SetFeeEstimateMode(*pwallet, coin_control, /* conf_target */ request.params[6], /* estimate_mode */ request.params[7], /* fee_rate */ request.params[8], /* override_min_fee */ false);
 
     std::vector<CRecipient> recipients;
-    ParseRecipients(sendTo, subtractFeeFromAmount, recipients);
+    ParseRecipients(pwallet, sendTo, subtractFeeFromAmount, recipients);
     const bool verbose{request.params[9].isNull() ? false : request.params[9].get_bool()};
 
     return SendMoney(pwallet, coin_control, recipients, std::move(mapValue), verbose);
@@ -3760,7 +3777,7 @@ public:
             // Always report the pubkey at the top level, so that `getnewaddress()['pubkey']` always works.
             if (subobj.exists("pubkey")) obj.pushKV("pubkey", subobj["pubkey"]);
             obj.pushKV("embedded", std::move(subobj));
-        } else if (which_type == TxoutType::MULTISIG || which_type == TxoutType::MULTISIG_DATA) {
+        } else if (which_type == TxoutType::MULTISIG || which_type == TxoutType::MULTISIG_REPLAY || which_type == TxoutType::MULTISIG_DATA || which_type == TxoutType::MULTISIG_DATA_REPLAY) {
             // Also report some information on multisig scripts (which do not have a corresponding address).
             // TODO: abstract out the common functionality between this logic and ExtractDestinations.
             obj.pushKV("sigsrequired", solutions_data[0][0]);

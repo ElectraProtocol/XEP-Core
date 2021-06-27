@@ -878,17 +878,21 @@ static std::string RecurseImportData(const CScript& script, ImportData& import_d
     TxoutType script_type = Solver(script, solverdata);
 
     switch (script_type) {
-    case TxoutType::PUBKEY: {
+    case TxoutType::PUBKEY:
+    case TxoutType::PUBKEY_REPLAY:
+    case TxoutType::PUBKEY_DATA_REPLAY: {
         CPubKey pubkey(solverdata[0].begin(), solverdata[0].end());
         import_data.used_keys.emplace(pubkey.GetID(), false);
         return "";
     }
-    case TxoutType::PUBKEYHASH: {
+    case TxoutType::PUBKEYHASH:
+    case TxoutType::PUBKEYHASH_REPLAY: {
         CKeyID id = CKeyID(uint160(solverdata[0]));
         import_data.used_keys[id] = true;
         return "";
     }
-    case TxoutType::SCRIPTHASH: {
+    case TxoutType::SCRIPTHASH:
+    case TxoutType::SCRIPTHASH_REPLAY: {
         if (script_ctx == ScriptContext::P2SH) throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Trying to nest P2SH inside another P2SH");
         if (script_ctx == ScriptContext::WITNESS_V0) throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Trying to nest P2SH inside a P2WSH");
         CHECK_NONFATAL(script_ctx == ScriptContext::TOP);
@@ -900,7 +904,9 @@ static std::string RecurseImportData(const CScript& script, ImportData& import_d
         return RecurseImportData(*subscript, import_data, ScriptContext::P2SH);
     }
     case TxoutType::MULTISIG:
-    case TxoutType::MULTISIG_DATA: {
+    case TxoutType::MULTISIG_REPLAY:
+    case TxoutType::MULTISIG_DATA:
+    case TxoutType::MULTISIG_DATA_REPLAY: {
         for (size_t i = 1; i + 1< solverdata.size(); ++i) {
             CPubKey pubkey(solverdata[i].begin(), solverdata[i].end());
             import_data.used_keys.emplace(pubkey.GetID(), false);

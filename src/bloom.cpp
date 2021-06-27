@@ -136,7 +136,7 @@ bool CBloomFilter::IsRelevantAndUpdate(const CTransaction& tx)
                 {
                     std::vector<std::vector<unsigned char> > vSolutions;
                     TxoutType type = Solver(txout.scriptPubKey, vSolutions);
-                    if (type == TxoutType::PUBKEY || type == TxoutType::MULTISIG || type == TxoutType::MULTISIG_DATA) {
+                    if (type == TxoutType::PUBKEY || type == TxoutType::PUBKEY_REPLAY || type == TxoutType::PUBKEY_DATA_REPLAY || type == TxoutType::MULTISIG || type == TxoutType::MULTISIG_REPLAY || type == TxoutType::MULTISIG_DATA || type == TxoutType::MULTISIG_DATA_REPLAY) {
                         insert(COutPoint(hash, i));
                     }
                 }

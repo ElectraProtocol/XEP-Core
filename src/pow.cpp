@@ -15,7 +15,7 @@
 
 #include <mutex>
 
-RecursiveMutex cs_target_cache;
+Mutex cs_target_cache;
 
 // peercoin: find last block index up to pindex
 static inline const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, const bool fProofOfStake)
@@ -173,10 +173,11 @@ unsigned int WeightedTargetExponentialMovingAverage(const CBlockIndex* pindexLas
     const int nInterval = nTargetTimespan / (nTargetSpacing * 2); // alpha_reciprocal = (N(SMA) + 1) / 2 for same "center of mass" as SMA
 
     // nActualSpacing must be restricted as to not produce a negative number below
-    if (nActualSpacing <= -((nInterval - 1) * nTargetSpacing))
-        nActualSpacing = -((nInterval - 1) * nTargetSpacing) + 1;
+    // The functionality of this if statement has been moved directly into the calculation of the numerator with the call to std::max
+    //if (nActualSpacing <= -((nInterval - 1) * nTargetSpacing))
+        //nActualSpacing = -((nInterval - 1) * nTargetSpacing) + 1;
 
-    const uint32_t numerator = (nInterval - 1) * nTargetSpacing + nActualSpacing;
+    const uint32_t numerator = std::max((nInterval - 1) * nTargetSpacing + nActualSpacing, 1);
     const uint32_t denominator = nInterval * nTargetSpacing;
 
     // Keep in mind the order of operations and integer division here - this is why the *= operator cannot be used, as it could cause overflow or integer division to occur
@@ -184,7 +185,7 @@ unsigned int WeightedTargetExponentialMovingAverage(const CBlockIndex* pindexLas
     bnNew = bnNew512.trim256();
 
     if (bnNew512 > arith_uint512(bnPowLimit) || bnNew == arith_uint256())
-        bnNew = bnPowLimit;
+        return nProofOfWorkLimit;
 
     return bnNew.GetCompactRounded();
 }
@@ -307,7 +308,7 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
     const bool fPositive = dividend >= 0;
     const uint32_t divisor = params.nPowTargetTimespan; // Must be positive
     const int exponent = dividend / divisor; // Note: this integer division rounds down positive and rounds up negative numbers via truncation, but the truncated fractional part is handled by the approximation below
-    const uint32_t remainder = fPositive ? dividend % divisor : -dividend % divisor; // Must be positive
+    const uint32_t remainder = (fPositive ? dividend : -dividend) % divisor; // Must be positive
     // We are using uint512 rather than uint64_t here because a nPowTargetTimespan of more than 3 days in the divisor may cause the following cubic approximation to overflow a uint64_t
     arith_uint512 numerator = 1;
     arith_uint512 denominator = 1;
@@ -360,7 +361,7 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
     //LogPrintf("denominator = %lu\n", denominator);
     //LogPrintf("10000 * 2^(%li/%u) = %s\n", dividend, divisor, arith_uint512((10000 * arith_uint512(numerator)) / arith_uint512(denominator)).trim256().ToString().c_str());
     if (bnNew512 > arith_uint512(bnPowLimit) || bnNew == arith_uint256())
-        bnNew = bnPowLimit;
+        return nProofOfWorkLimit;
 
     return bnNew.GetCompactRounded();
 }

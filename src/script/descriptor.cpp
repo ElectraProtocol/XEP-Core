@@ -988,13 +988,13 @@ std::unique_ptr<DescriptorImpl> InferScript(const CScript& script, ParseScriptCo
     std::vector<std::vector<unsigned char>> data;
     TxoutType txntype = Solver(script, data);
 
-    if (txntype == TxoutType::PUBKEY) {
+    if (txntype == TxoutType::PUBKEY || txntype == TxoutType::PUBKEY_REPLAY || txntype == TxoutType::PUBKEY_DATA_REPLAY) {
         CPubKey pubkey(data[0].begin(), data[0].end());
         if (pubkey.IsValid()) {
             return MakeUnique<PKDescriptor>(InferPubkey(pubkey, ctx, provider));
         }
     }
-    if (txntype == TxoutType::PUBKEYHASH) {
+    if (txntype == TxoutType::PUBKEYHASH || txntype == TxoutType::PUBKEYHASH_REPLAY) {
         uint160 hash(data[0]);
         CKeyID keyid(hash);
         CPubKey pubkey;
@@ -1010,7 +1010,7 @@ std::unique_ptr<DescriptorImpl> InferScript(const CScript& script, ParseScriptCo
             return MakeUnique<WPKHDescriptor>(InferPubkey(pubkey, ctx, provider));
         }
     }
-    if (txntype == TxoutType::MULTISIG || txntype == TxoutType::MULTISIG_DATA) {
+    if (txntype == TxoutType::MULTISIG || txntype == TxoutType::MULTISIG_REPLAY || txntype == TxoutType::MULTISIG_DATA || txntype == TxoutType::MULTISIG_DATA_REPLAY) {
         std::vector<std::unique_ptr<PubkeyProvider>> providers;
         for (size_t i = 1; i + 1 < data.size(); ++i) {
             CPubKey pubkey(data[i].begin(), data[i].end());
@@ -1018,7 +1018,7 @@ std::unique_ptr<DescriptorImpl> InferScript(const CScript& script, ParseScriptCo
         }
         return MakeUnique<MultisigDescriptor>((int)data[0][0], std::move(providers));
     }
-    if (txntype == TxoutType::SCRIPTHASH && ctx == ParseScriptContext::TOP) {
+    if ((txntype == TxoutType::SCRIPTHASH || txntype == TxoutType::SCRIPTHASH_REPLAY) && ctx == ParseScriptContext::TOP) {
         uint160 hash(data[0]);
         CScriptID scriptid(hash);
         CScript subscript;

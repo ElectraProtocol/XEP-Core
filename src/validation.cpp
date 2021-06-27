@@ -201,7 +201,7 @@ CBlockIndex* FindForkInGlobalIndex(const CChain& chain, const CBlockLocator& loc
 
 std::unique_ptr<CBlockTreeDB> pblocktree;
 
-bool CheckInputScripts(const CTransaction& tx, TxValidationState &state, const CCoinsViewCache &inputs, unsigned int flags, bool cacheSigStore, bool cacheFullScriptStore, PrecomputedTransactionData& txdata, std::vector<CScriptCheck> *pvChecks = nullptr);
+bool CheckInputScripts(const CTransaction& tx, TxValidationState &state, const CCoinsViewCache &inputs, const CChain& chain, unsigned int flags, bool cacheSigStore, bool cacheFullScriptStore, PrecomputedTransactionData& txdata, std::vector<CScriptCheck> *pvChecks = nullptr);
 static FILE* OpenUndoFile(const FlatFilePos &pos, bool fReadOnly = false);
 static FlatFileSeq BlockFileSeq();
 static FlatFileSeq UndoFileSeq();
@@ -444,7 +444,7 @@ static bool CheckInputsFromMempoolAndCache(const CTransaction& tx, TxValidationS
     }
 
     // Call CheckInputScripts() to cache signature and script validity against current tip consensus rules.
-    return CheckInputScripts(tx, state, view, flags, /* cacheSigStore = */ true, /* cacheFullSciptStore = */ true, txdata);
+    return CheckInputScripts(tx, state, view, ::ChainActive(), flags, /* cacheSigStore = */ true, /* cacheFullSciptStore = */ true, txdata);
 }
 
 namespace {
@@ -585,6 +585,40 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
     if (fRequireStandard && !IsStandardTx(tx, reason))
         return state.Invalid(TxValidationResult::TX_NOT_STANDARD, reason);
 
+    // Check replay protection data references a block which is currently in the active chain
+    if (fRequireStandard) {
+        std::vector<std::vector<unsigned char>> vSolutions;
+        for (const CTxOut& txout : tx.vout) {
+            TxoutType whichType = Solver(txout.scriptPubKey, vSolutions);
+            if (whichType == TxoutType::PUBKEYHASH_REPLAY || whichType == TxoutType::SCRIPTHASH_REPLAY || whichType == TxoutType::PUBKEY_REPLAY || whichType == TxoutType::PUBKEY_DATA_REPLAY) {
+                // Some of these checks are redundant with the standardness checks above
+                reason = "replay-height";
+                if (vSolutions.size() != 3 || vSolutions[2].size() > 4 || vSolutions[2].size() < 1) {
+                    return state.Invalid(TxValidationResult::TX_NOT_STANDARD, reason);
+                }
+
+                const int nHeight = CScriptNum(vSolutions[2], true, 4).getint();
+                if (nHeight > ::ChainActive().Height() - 10 || nHeight < 0) {
+                    return state.Invalid(TxValidationResult::TX_NOT_STANDARD, reason);
+                }
+
+                reason = "replay-blockhash";
+                if (vSolutions[1].size() > 32 || vSolutions[1].size() < 1) {
+                    return state.Invalid(TxValidationResult::TX_NOT_STANDARD, reason);
+                }
+
+                const uint256& blockHash = ::ChainActive()[nHeight]->GetBlockHash();
+                std::vector<unsigned char> vchBlockHash(blockHash.begin(), blockHash.end());
+                assert(vSolutions[1].size() <= vchBlockHash.size());
+                vchBlockHash.erase(vchBlockHash.begin() + vSolutions[1].size(), vchBlockHash.end());
+
+                if (vSolutions[1] != vchBlockHash) {
+                    return state.Invalid(TxValidationResult::TX_NOT_STANDARD, reason);
+                }
+            }
+        }
+    }
+
     // Do not work on transactions that are too small.
     // A transaction with 1 segwit input and 1 P2WPHK output has non-witness size of 82 bytes.
     // Transactions smaller than this are not relayed to mitigate CVE-2017-12842 by not relaying
@@ -703,7 +737,7 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
     if (tx.HasWitness() && fRequireStandard && !IsWitnessStandard(tx, m_view))
         return state.Invalid(TxValidationResult::TX_WITNESS_MUTATED, "bad-witness-nonstandard");
 
-    int64_t nSigOpsCost = GetTransactionSigOpCost(tx, m_view, STANDARD_SCRIPT_VERIFY_FLAGS);
+    int64_t nSigOpsCost = GetTransactionSigOpCost(tx, m_view, STANDARD_NONCONTEXTUAL_SCRIPT_VERIFY_FLAGS);
 
     // nModifiedFees includes any fee deltas from PrioritiseTransaction
     nModifiedFees = nFees;
@@ -930,17 +964,17 @@ bool MemPoolAccept::PolicyScriptChecks(ATMPArgs& args, Workspace& ws, Precompute
 
     TxValidationState &state = args.m_state;
 
-    constexpr unsigned int scriptVerifyFlags = STANDARD_SCRIPT_VERIFY_FLAGS;
+    constexpr unsigned int scriptVerifyFlags = STANDARD_CONTEXTUAL_SCRIPT_VERIFY_FLAGS;
 
     // Check input scripts and signatures.
     // This is done last to help prevent CPU exhaustion denial-of-service attacks.
-    if (!CheckInputScripts(tx, state, m_view, scriptVerifyFlags, true, false, txdata)) {
+    if (!CheckInputScripts(tx, state, m_view, ::ChainActive(), scriptVerifyFlags, true, false, txdata)) {
         // SCRIPT_VERIFY_CLEANSTACK requires SCRIPT_VERIFY_WITNESS, so we
         // need to turn both off, and compare against just turning off CLEANSTACK
         // to see if the failure is specifically due to witness validation.
         TxValidationState state_dummy; // Want reported failures to be from first CheckInputScripts
-        if (!tx.HasWitness() && CheckInputScripts(tx, state_dummy, m_view, scriptVerifyFlags & ~(SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_CLEANSTACK), true, false, txdata) &&
-                !CheckInputScripts(tx, state_dummy, m_view, scriptVerifyFlags & ~SCRIPT_VERIFY_CLEANSTACK, true, false, txdata)) {
+        if (!tx.HasWitness() && CheckInputScripts(tx, state_dummy, m_view, ::ChainActive(), scriptVerifyFlags & ~(SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_CLEANSTACK), true, false, txdata) &&
+                !CheckInputScripts(tx, state_dummy, m_view, ::ChainActive(), scriptVerifyFlags & ~SCRIPT_VERIFY_CLEANSTACK, true, false, txdata)) {
             // Only the witness is missing, so the transaction itself may be fine.
             state.Invalid(TxValidationResult::TX_WITNESS_STRIPPED,
                     state.GetRejectReason(), state.GetDebugMessage());
@@ -1528,7 +1562,7 @@ void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, int nHeight)
 bool CScriptCheck::operator()() {
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
     const CScriptWitness *witness = &ptxTo->vin[nIn].scriptWitness;
-    return VerifyScript(scriptSig, m_tx_out.scriptPubKey, witness, nFlags, CachingTransactionSignatureChecker(ptxTo, nIn, m_tx_out.nValue, cacheStore, *txdata), &error);
+    return VerifyScript(scriptSig, m_tx_out.scriptPubKey, witness, nFlags, CachingTransactionSignatureChecker(ptxTo, nIn, m_tx_out.nValue, chain, cacheStore, *txdata), &error);
 }
 
 int GetSpendHeight(const CCoinsViewCache& inputs)
@@ -1577,7 +1611,7 @@ void InitScriptExecutionCache() {
  *
  * Non-static (and re-declared) in src/test/txvalidationcache_tests.cpp
  */
-bool CheckInputScripts(const CTransaction& tx, TxValidationState &state, const CCoinsViewCache &inputs, unsigned int flags, bool cacheSigStore, bool cacheFullScriptStore, PrecomputedTransactionData& txdata, std::vector<CScriptCheck> *pvChecks) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
+bool CheckInputScripts(const CTransaction& tx, TxValidationState &state, const CCoinsViewCache &inputs, const CChain& chain, unsigned int flags, bool cacheSigStore, bool cacheFullScriptStore, PrecomputedTransactionData& txdata, std::vector<CScriptCheck> *pvChecks) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
 {
     if (tx.IsCoinBase()) return true;
 
@@ -1621,12 +1655,15 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState &state, const C
         // spent being checked as a part of CScriptCheck.
 
         // Verify signature
-        CScriptCheck check(txdata.m_spent_outputs[i], tx, i, flags, cacheSigStore, &txdata);
+        CScriptCheck check(txdata.m_spent_outputs[i], tx, i, &chain, flags, cacheSigStore, &txdata);
         if (pvChecks) {
             pvChecks->push_back(CScriptCheck());
             check.swap(pvChecks->back());
         } else if (!check()) {
-            if (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) {
+            if (check.GetScriptError() == SCRIPT_ERR_NOT_FINAL) {
+                return state.Invalid(TxValidationResult::TX_PREMATURE_SPEND, strprintf("non-final (%s)", ScriptErrorString(check.GetScriptError())));
+            }
+            if (flags & STANDARD_CONTEXTUAL_NOT_MANDATORY_VERIFY_FLAGS) {
                 // Check whether the failure was caused by a
                 // non-mandatory script verification check, such as
                 // non-standard DER encodings or non-null dummy
@@ -1635,8 +1672,8 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState &state, const C
                 // splitting the network between upgraded and
                 // non-upgraded nodes by banning CONSENSUS-failing
                 // data providers.
-                CScriptCheck check2(txdata.m_spent_outputs[i], tx, i,
-                        flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS, cacheSigStore, &txdata);
+                CScriptCheck check2(txdata.m_spent_outputs[i], tx, i, &chain,
+                        flags & ~STANDARD_CONTEXTUAL_NOT_MANDATORY_VERIFY_FLAGS, cacheSigStore, &txdata);
                 if (check2())
                     return state.Invalid(TxValidationResult::TX_NOT_STANDARD, strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(check.GetScriptError())));
             }
@@ -1970,6 +2007,7 @@ static unsigned int GetBlockScriptFlags(const CBlockIndex* pindex, const Consens
     // deployment is defined).
     if (flags & SCRIPT_VERIFY_P2SH && IsScriptWitnessEnabled(consensusparams)) {
         flags |= SCRIPT_VERIFY_WITNESS;
+        flags |= SCRIPT_VERIFY_CLEANSTACK;
     }
 
     // Start enforcing the DERSIG (BIP66) rule
@@ -1995,6 +2033,11 @@ static unsigned int GetBlockScriptFlags(const CBlockIndex* pindex, const Consens
     // Start enforcing BIP147 NULLDUMMY (activated simultaneously with segwit)
     if (IsWitnessEnabled(pindex->pprev, consensusparams)) {
         flags |= SCRIPT_VERIFY_NULLDUMMY;
+    }
+
+    // Start enforcing BIP115 (CHECKBLOCKATHEIGHTVERIFY)
+    if (pindex->nHeight >= 1) {
+        flags |= SCRIPT_VERIFY_CHECKBLOCKATHEIGHTVERIFY;
     }
 
     return flags;
@@ -2370,7 +2413,7 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
             std::vector<CScriptCheck> vChecks;
             bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks (still consult the cache, though) */
             TxValidationState tx_state;
-            if (fScriptChecks && !CheckInputScripts(tx, tx_state, view, flags, fCacheResults, fCacheResults, txsdata[i], g_parallel_script_checks ? &vChecks : nullptr)) {
+            if (fScriptChecks && !CheckInputScripts(tx, tx_state, view, m_chain, flags, fCacheResults, fCacheResults, txsdata[i], g_parallel_script_checks ? &vChecks : nullptr)) {
                 // Any transaction validation failure in ConnectBlock is a block consensus failure
                 state.Invalid(BlockValidationResult::BLOCK_CONSENSUS,
                               tx_state.GetRejectReason(), tx_state.GetDebugMessage());
@@ -2393,10 +2436,9 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
     CAmount nExpectedBlockReward = GetBlockSubsidy(pindex->nHeight, fProofOfStake, nCoinAge, chainparams.GetConsensus());
     CAmount nTreasuryPayment = GetTreasuryPayment(pindex->nHeight, chainparams.GetConsensus());
 
-    //if (fProofOfStake) // Fees are burned on and after the first PoS block
-        nAmountBurned += nFees;
-    //else
-        //nExpectedBlockReward += nFees;
+    if (chainparams.NetworkIDString() != CBaseChainParams::MAIN) { // Half of fees are burned on and after the first PoS block
+        nExpectedBlockReward += nFees / 2;
+    }
 
     if (nTreasuryPayment > 0 && IsTreasuryBlock(pindex->nHeight, chainparams.GetConsensus())) {
         const CTransaction& txNew = fProofOfStake ? *block.vtx[1] : *block.vtx[0];
@@ -2438,7 +2480,7 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
 
     // peercoin: track money supply and mint amount info
     pindex->nMint = nActualBlockReward;
-    pindex->nMoneySupply = (pindex->pprev ? pindex->pprev->nMoneySupply : 0) + pindex->nMint - nAmountBurned;
+    pindex->nMoneySupply = (pindex->pprev ? pindex->pprev->nMoneySupply : 0) + pindex->nMint - nAmountBurned - nFees; // Fees are not added to nMoneySupply because they are already part of the circulating supply
     pindex->nTreasuryPayment = nTreasuryPayment;
     //LogPrintf("ConnectBlock(): INFO: nValueOut: %s, nValueIn: %s, nFees: %s, nMint: %s\n", FormatMoney(nValueOut), FormatMoney(nValueIn), FormatMoney(nFees), FormatMoney(pindex->nMint));
 
@@ -3757,6 +3799,13 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
 {
     assert(pindexPrev != nullptr);
     const int nHeight = pindexPrev->nHeight + 1;
+    const int chainHeight = ::ChainActive().Height();
+
+    // If this is a reorg and we have been synced for at least an hour, check that it is not too deep
+    const int nMaxReorgDepth = gArgs.GetArg("-maxreorgdepth", DEFAULT_MAX_REORG_DEPTH);
+    static int64_t nReorgCheckTime = GetTime() + 60 * 60;
+    if (nMaxReorgDepth >= 0 && GetTime() >= nReorgCheckTime && chainHeight - nHeight >= nMaxReorgDepth)
+        return state.Invalid(BlockValidationResult::BLOCK_CHECKPOINT, "bad-fork-prior-to-max-reorg-depth", strprintf("%s: forked chain older than max reorganization depth (height %d, depth %d)", __func__, nHeight, chainHeight - nHeight));
 
     // Check proof of work
     const Consensus::Params& consensusParams = params.GetConsensus();
@@ -5738,7 +5787,8 @@ bool GetCoinAge(const CTransaction& tx, const CCoinsViewCache& view, unsigned in
 // peercoin: check block signature
 bool CheckBlockSignature(const CBlock& block)
 {
-    if (block.GetHash() == Params().GetConsensus().hashGenesisBlock)
+    const uint256& blockHash = block.GetHash();
+    if (blockHash == Params().GetConsensus().hashGenesisBlock)
         return block.vchBlockSig.empty();
 
     if (block.vchBlockSig.empty())
@@ -5757,7 +5807,7 @@ bool CheckBlockSignature(const CBlock& block)
         const CTxIn& txin = fProofOfStake ? block.vtx[1]->vin[0] : cbtxin;
         if (fProofOfStake && (txin.scriptSig.size() == 0 || txin.scriptSig.size() == 23) && txin.scriptWitness.stack.size() == 2 && txin.scriptWitness.stack.back().size() == CPubKey::COMPRESSED_SIZE) { // p2wpkh or p2sh-p2wpkh input
             pubkey = CPubKey(txin.scriptWitness.stack.back());
-        } else if (fProofOfStake && txin.scriptWitness.stack.size() == 0 && txin.scriptSig.size() >= 100 && txin.scriptSig.size() <= 140 && txin.scriptSig.IsPushOnly() && txin.scriptSig[0] >= 70 && txin.scriptSig[0] <= 73) { // p2pkh input (sig + pubkey)
+        } else if (fProofOfStake && txin.scriptWitness.stack.size() == 0 && txin.scriptSig.size() >= 100 && txin.scriptSig.size() <= 140 && txin.scriptSig.IsPushOnly() && txin.scriptSig[0] >= CPubKey::COMPACT_SIGNATURE_SIZE && txin.scriptSig[0] <= (CPubKey::SIGNATURE_SIZE + 1)) { // p2pkh input (sig + pubkey)
             unsigned int pubkeyStart = txin.scriptSig[0] + 2u; // skip sig and length bytes by reading sig length from pushdata
             //LogPrintf("%s : p2pkh txin.scriptSig = %s\n", __func__, HexStr(txin.scriptSig));
             //LogPrintf("%s : txin.scriptSig.size() = %u, txin.scriptSig[0] = %u, pubkeyStart = %u\n", __func__, txin.scriptSig.size(), txin.scriptSig[0], pubkeyStart);
@@ -5796,5 +5846,13 @@ bool CheckBlockSignature(const CBlock& block)
     if (!pubkey.IsCompressed())
         return error("%s : invalid pubkey %s", __func__, HexStr(pubkey));
 
-    return pubkey.Verify(block.GetHash(), block.vchBlockSig);
+    if (CPubKey::GetSigType(block.vchBlockSig[0]) == CPubKey::SigType::SIG_COMPACT) {
+        CPubKey recoveredPubKey;
+        // Only compressed pubkeys are supported and RecoverCompact already checks sig size
+        return ((block.vchBlockSig[0] & 4) &&
+                recoveredPubKey.RecoverCompact(blockHash, block.vchBlockSig, CPubKey::SigFlag::VERSION_SIG_COMPACT) &&
+                recoveredPubKey == pubkey);
+    } else {
+        return pubkey.Verify(blockHash, block.vchBlockSig);
+    }
 }

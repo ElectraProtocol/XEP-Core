@@ -403,10 +403,16 @@ crypto_libxep_crypto_base_a_SOURCES = \
   crypto/common.h \
   crypto/hkdf_sha256_32.cpp \
   crypto/hkdf_sha256_32.h \
+  crypto/hmac_ripemd160.cpp \
+  crypto/hmac_ripemd160.h \
+  crypto/hmac_sha1.cpp \
+  crypto/hmac_sha1.h \
   crypto/hmac_sha256.cpp \
   crypto/hmac_sha256.h \
   crypto/hmac_sha512.cpp \
   crypto/hmac_sha512.h \
+  crypto/pbkdf2_hmac.cpp \
+  crypto/pbkdf2_hmac.h \
   crypto/poly1305.h \
   crypto/poly1305.cpp \
   crypto/ripemd160.cpp \

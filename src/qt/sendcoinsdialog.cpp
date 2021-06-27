@@ -427,7 +427,7 @@ void SendCoinsDialog::on_sendButton_clicked()
             if (filename.isEmpty()) {
                 return;
             }
-            std::ofstream out(filename.toLocal8Bit().data());
+            std::ofstream out(filename.toLocal8Bit().data(), std::ofstream::out | std::ofstream::binary);
             out << ssTx.str();
             out.close();
             Q_EMIT message(tr("PSBT saved"), "PSBT saved to disk", CClientUIInterface::MSG_INFORMATION);
@@ -746,7 +746,7 @@ void SendCoinsDialog::updateCoinControlState(CCoinControl& ctrl)
     ctrl.fAllowWatchOnly = model->wallet().privateKeysDisabled();
 }
 
-void SendCoinsDialog::updateNumberOfBlocks(int count, const QDateTime& blockDate, double nVerificationProgress, bool headers, SynchronizationState sync_state) {
+void SendCoinsDialog::updateNumberOfBlocks(int count, const QDateTime& blockDate, const QString& blockHash, double nVerificationProgress, bool headers, SynchronizationState sync_state) {
     if (sync_state == SynchronizationState::POST_INIT) {
         updateSmartFeeLabel();
     }
@@ -966,6 +966,9 @@ SendConfirmationDialog::SendConfirmationDialog(const QString& title, const QStri
     setStandardButtons(QMessageBox::Yes | QMessageBox::Cancel);
     setDefaultButton(QMessageBox::Cancel);
     yesButton = button(QMessageBox::Yes);
+    if (confirmButtonText.isEmpty()) {
+        confirmButtonText = yesButton->text();
+    }
     updateYesButton();
     connect(&countDownTimer, &QTimer::timeout, this, &SendConfirmationDialog::countDown);
 }

@@ -64,6 +64,7 @@ public:
         PruneSize,              // int
         DatabaseCache,          // int
         SpendZeroConfChange,    // bool
+        TargetStakeInputs,      // int
         Listen,                 // bool
         OptionIDRowCount,
     };

@@ -13,6 +13,7 @@
 #include <qt/guiutil.h>
 #include <qt/walletmodel.h>
 
+#include <util/system.h>
 #include <support/allocators/secure.h>
 
 #include <QKeyEvent>
@@ -52,6 +53,7 @@ AskPassphraseDialog::AskPassphraseDialog(Mode _mode, QWidget *parent, SecureStri
             break;
         case Unlock: // Ask passphrase
             ui->warningLabel->setText(tr("This operation needs your wallet passphrase to unlock the wallet."));
+            ui->sleepWarningLabel->setText(tr("Warning: If your computer goes to sleep, your wallet may stop staking or receive orphaned stakes!"));
             ui->passLabel2->hide();
             ui->passEdit2->hide();
             ui->passLabel3->hide();
@@ -77,6 +79,11 @@ AskPassphraseDialog::AskPassphraseDialog(Mode _mode, QWidget *parent, SecureStri
     connect(ui->passEdit2, &QLineEdit::textChanged, this, &AskPassphraseDialog::textChanged);
     connect(ui->passEdit3, &QLineEdit::textChanged, this, &AskPassphraseDialog::textChanged);
 
+    ui->sleepWarningLabel->hide();
+    ui->unlockAskingForPasswordCheckbox->setChecked(false);
+    ui->unlockAskingForPasswordCheckbox->setEnabled(mode == Unlock);
+    ui->unlockAskingForPasswordCheckbox->setVisible(mode == Unlock);
+
     GUIUtil::handleCloseWindowShortcut(this);
 }
 
@@ -89,6 +96,14 @@ AskPassphraseDialog::~AskPassphraseDialog()
 void AskPassphraseDialog::setModel(WalletModel *_model)
 {
     this->model = _model;
+
+    if (model && mode == Unlock && model->getEncryptionStatus() == WalletModel::Locked) {
+        ui->sleepWarningLabel->setVisible(gArgs.GetBoolArg("-staking", true));
+        ui->unlockAskingForPasswordCheckbox->setChecked(true);
+    } else {
+        ui->unlockAskingForPasswordCheckbox->setEnabled(false);
+        ui->unlockAskingForPasswordCheckbox->setVisible(false);
+    }
 }
 
 void AskPassphraseDialog::accept()
@@ -166,7 +181,7 @@ void AskPassphraseDialog::accept()
         } break;
     case Unlock:
         try {
-            if (!model->setWalletLocked(false, oldpass)) {
+            if (!model->setWalletLocked(false, ui->unlockAskingForPasswordCheckbox->isChecked(), oldpass)) {
                 QMessageBox::critical(this, tr("Wallet unlock failed"),
                                       tr("The passphrase entered for the wallet decryption was incorrect."));
             } else {

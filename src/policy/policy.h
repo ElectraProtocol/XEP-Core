@@ -41,7 +41,7 @@ static const unsigned int MAX_STANDARD_TX_SIGOPS_COST = MAX_BLOCK_SIGOPS_COST/5;
 /** Default for -maxmempool, maximum megabytes of mempool memory usage */
 static const unsigned int DEFAULT_MAX_MEMPOOL_SIZE = 300;
 /** Default for -incrementalrelayfee, which sets the minimum feerate increase for mempool limiting or BIP 125 replacement **/
-static const unsigned int DEFAULT_INCREMENTAL_RELAY_FEE = 100000; // 1 * DEFAULT_BLOCK_MIN_TX_FEE
+static const unsigned int DEFAULT_INCREMENTAL_RELAY_FEE = 1000; // would be 1 * DEFAULT_BLOCK_MIN_TX_FEE but left at default value
 /** Default for -bytespersigop */
 static const unsigned int DEFAULT_BYTES_PER_SIGOP = 20;
 /** Default for -permitbaremultisig */
@@ -65,7 +65,7 @@ static const unsigned int DUST_RELAY_TX_FEE = 300000; // 3 * DEFAULT_BLOCK_MIN_T
  * with. However scripts violating these flags may still be present in valid
  * blocks and we must accept those blocks.
  */
-static constexpr unsigned int STANDARD_SCRIPT_VERIFY_FLAGS = MANDATORY_SCRIPT_VERIFY_FLAGS |
+static constexpr unsigned int STANDARD_CONTEXTUAL_SCRIPT_VERIFY_FLAGS = MANDATORY_SCRIPT_VERIFY_FLAGS |
                                                              SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS |
                                                              SCRIPT_VERIFY_CLEANSTACK |
                                                              SCRIPT_VERIFY_MINIMALIF |
@@ -78,10 +78,14 @@ static constexpr unsigned int STANDARD_SCRIPT_VERIFY_FLAGS = MANDATORY_SCRIPT_VE
                                                              SCRIPT_VERIFY_TAPROOT |
                                                              SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_TAPROOT_VERSION |
                                                              SCRIPT_VERIFY_DISCOURAGE_OP_SUCCESS |
-                                                             SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_PUBKEYTYPE;
+                                                             SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_PUBKEYTYPE |
+                                                             SCRIPT_VERIFY_CHECKBLOCKATHEIGHTVERIFY;
+
+/** For convenience, standard but not contextual verify flags. */
+static constexpr unsigned int STANDARD_NONCONTEXTUAL_SCRIPT_VERIFY_FLAGS = STANDARD_CONTEXTUAL_SCRIPT_VERIFY_FLAGS & ~CONTEXTUAL_SCRIPT_VERIFY_FLAGS;
 
 /** For convenience, standard but not mandatory verify flags. */
-static constexpr unsigned int STANDARD_NOT_MANDATORY_VERIFY_FLAGS = STANDARD_SCRIPT_VERIFY_FLAGS & ~MANDATORY_SCRIPT_VERIFY_FLAGS;
+static constexpr unsigned int STANDARD_CONTEXTUAL_NOT_MANDATORY_VERIFY_FLAGS = STANDARD_CONTEXTUAL_SCRIPT_VERIFY_FLAGS & ~MANDATORY_SCRIPT_VERIFY_FLAGS;
 
 /** Used as the flags parameter to sequence and nLocktime checks in non-consensus code. */
 static constexpr unsigned int STANDARD_LOCKTIME_VERIFY_FLAGS = LOCKTIME_VERIFY_SEQUENCE |

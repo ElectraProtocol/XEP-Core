@@ -48,7 +48,8 @@ bool CheckTransaction(const CTransaction& tx, TxValidationState& state)
 
     if (tx.IsCoinBase())
     {
-        if (tx.vin[0].scriptSig.size() < 2 || tx.vin[0].scriptSig.size() > 120)
+        const unsigned int maxSigLength = static_cast<uint32_t>(tx.nVersion) >= 2 ? 100 : 120;
+        if (tx.vin[0].scriptSig.size() < 2 || tx.vin[0].scriptSig.size() > maxSigLength)
             return state.Invalid(TxValidationResult::TX_CONSENSUS, "bad-cb-length");
     }
     else

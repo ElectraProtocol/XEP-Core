@@ -130,16 +130,23 @@ static const unsigned int MANDATORY_SCRIPT_VERIFY_FLAGS = SCRIPT_VERIFY_P2SH |
                                                           SCRIPT_VERIFY_MINIMALDATA |
                                                           SCRIPT_VERIFY_NULLDUMMY |
                                                           SCRIPT_VERIFY_NULLFAIL |
-                                                          SCRIPT_VERIFY_LOW_S;
+                                                          SCRIPT_VERIFY_LOW_S |
+                                                          SCRIPT_VERIFY_SIGPUSHONLY;
 
 enum class TxoutType {
     NONSTANDARD,
     // 'standard' transaction types:
     PUBKEY,
+    PUBKEY_REPLAY,
+    PUBKEY_DATA_REPLAY,
     PUBKEYHASH,
+    PUBKEYHASH_REPLAY,
     SCRIPTHASH,
+    SCRIPTHASH_REPLAY,
     MULTISIG,
+    MULTISIG_REPLAY,
     MULTISIG_DATA,
+    MULTISIG_DATA_REPLAY,
     NULL_DATA, //!< unspendable OP_RETURN script that carries data
     WITNESS_V0_SCRIPTHASH,
     WITNESS_V0_KEYHASH,

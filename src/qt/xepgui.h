@@ -39,6 +39,7 @@ class WalletModel;
 class HelpMessageDialog;
 class UpdateWalletDialog;
 class ModalOverlay;
+class AppLocker;
 enum class SynchronizationState;
 
 namespace interfaces {
@@ -121,6 +122,7 @@ private:
     std::unique_ptr<interfaces::Handler> m_handler_question;
     ClientModel* clientModel = nullptr;
     WalletFrame* walletFrame = nullptr;
+    AppLocker* appLocker = nullptr;
 
     UnitDisplayStatusBarControl* unitDisplayControl = nullptr;
     QLabel* labelWalletEncryptionIcon = nullptr;
@@ -153,6 +155,7 @@ private:
     QAction* encryptWalletAction = nullptr;
     QAction* unlockWalletAction = nullptr;
     QAction* lockWalletAction = nullptr;
+    QAction* appLockerAction = nullptr;
     QAction* backupWalletAction = nullptr;
     QAction* changePassphraseAction = nullptr;
     QAction* aboutQtAction = nullptr;
@@ -168,6 +171,14 @@ private:
     QAction* m_wallet_selector_action = nullptr;
     QAction* m_mask_values_action{nullptr};
     QAction* m_hide_orphans_action{nullptr};
+
+    // Links menu
+    QAction* websiteLinkAction = nullptr;
+    QAction* explorerOneAction = nullptr;
+    QAction* explorerTwoAction = nullptr;
+    QAction* githubLinkAction = nullptr;
+    QAction* cmcLinkAction = nullptr;
+    QAction* coingeckoLinkAction = nullptr;
 
     QLabel *m_wallet_selector_label = nullptr;
     QComboBox* m_wallet_selector = nullptr;
@@ -230,7 +241,7 @@ public Q_SLOTS:
     /** Set network state shown in the UI */
     void setNetworkActive(bool networkActive);
     /** Set number of blocks and last block date shown in the UI */
-    void setNumBlocks(int count, const QDateTime& blockDate, double nVerificationProgress, bool headers, SynchronizationState sync_state);
+    void setNumBlocks(int count, const QDateTime& blockDate, const QString& blockHash, double nVerificationProgress, bool headers, SynchronizationState sync_state);
 
     /** Notify the user of an event from the core network or transaction handling code.
        @param[in] title             the message box / notification title

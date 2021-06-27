@@ -409,14 +409,25 @@ uint256 stakeHash(const unsigned int& nTimeTx, CDataStream& ss, const unsigned i
     return Hash(ss);
 }
 
+static inline unsigned int CalculateTimeWeight(const unsigned int& nTimeTx, const unsigned int& nTimeBlockFrom, const int64_t& nStakeMinAge, const int64_t& nStakeMaxAge, const int64_t& nMinTimeWeight)
+{
+    int64_t nTimeDiff = std::max(nTimeTx - nTimeBlockFrom - nStakeMinAge, static_cast<int64_t>(0));
+    // Time weight grows to a maximum of (nStakeMaxAge + nMinTimeWeight) / 2 and then decreases to a minimum of (nMinTimeWeight + nStakeMinAge) in order to
+    // incentivize active staking because the likelihood of staking will begin to decrease past ((nStakeMaxAge + nMinTimeWeight) / 2) + nStakeMinAge in days
+    unsigned int nTimeWeight = std::min(nTimeDiff, std::max(nStakeMaxAge + nMinTimeWeight - nTimeDiff, nMinTimeWeight + nStakeMinAge));
+    return nTimeWeight;
+}
+
 // Test hash vs target
-static inline bool stakeTargetHit(const uint256& hashProofOfStake, const CAmount& nValueIn, const arith_uint256& bnTargetPerCoinDay, bool fNewWeight)
+static inline bool stakeTargetHit(const uint256& hashProofOfStake, const CAmount& nValueIn, const unsigned int& nTimeWeight, const arith_uint256& bnTargetPerCoinDay, bool fNewWeight, bool fUseTimeWeight)
 {
     // Get the stake weight - weight is equal to coin amount
-    arith_uint512 bnCoinDayWeight = fNewWeight ? arith_uint512(nValueIn) : (arith_uint512(nValueIn) / 100);
+    arith_uint512 bnSatoshiDayWeight = fNewWeight ? arith_uint512(nValueIn) : (arith_uint512(nValueIn) / 100);
+    if (fUseTimeWeight)
+        bnSatoshiDayWeight = (bnSatoshiDayWeight * nTimeWeight) / (24 * 60 * 60);
 
     // Now check if proof-of-stake hash meets target protocol
-    return (arith_uint512(UintToArith256(hashProofOfStake)) <= bnCoinDayWeight * arith_uint512(bnTargetPerCoinDay));
+    return (arith_uint512(UintToArith256(hashProofOfStake)) <= bnSatoshiDayWeight * arith_uint512(bnTargetPerCoinDay));
 }
 
 // Get the stake modifier specified by the protocol to hash for a stake kernel
@@ -476,7 +487,9 @@ bool CheckStakeKernelHash(const unsigned int& nBits, const CBlockIndex* pindexPr
     const unsigned int nTimeBlockFrom = pindexFrom->GetBlockTime();
     const int nHeightBlockFrom = pindexFrom->nHeight;
     const int64_t nStakeMinAge = params.nStakeMinAge;
+    const int64_t nStakeMaxAge = params.nStakeMaxAge;
     const int nStakeMinDepth = params.nStakeMinDepth;
+    constexpr int64_t nMinTimeWeight = 1 * 24 * 60 * 60; // 1 day
 
     if (nTimeTx < nTimeBlockFrom) // Transaction timestamp violation
         return error("CheckStakeKernelHash() : nTime violation");
@@ -497,6 +510,10 @@ bool CheckStakeKernelHash(const unsigned int& nBits, const CBlockIndex* pindexPr
     if (fNegative || bnTargetPerCoinDay == 0 || fOverflow || bnTargetPerCoinDay > UintToArith256(params.powLimit[CBlockHeader::ALGO_POS]))
         return false;
 
+    // v0.3 protocol kernel hash weight starts from 0 at the min age
+    // this change increases active coins participating the hash and helps
+    // to secure the network when proof-of-stake difficulty is low
+    unsigned int nTimeWeight = CalculateTimeWeight(nTimeTx, nTimeBlockFrom, nStakeMinAge, nStakeMaxAge, nMinTimeWeight);
     // Create data stream once instead of repeating it in the loop
     CDataStream ss(SER_GETHASH, 0);
     // Grab stake modifier
@@ -539,7 +556,7 @@ bool CheckStakeKernelHash(const unsigned int& nBits, const CBlockIndex* pindexPr
                 hashProofOfStake.ToString());
         }
 
-        return stakeTargetHit(hashProofOfStake, nValueIn, bnTargetPerCoinDay, true);
+        return stakeTargetHit(hashProofOfStake, nValueIn, nTimeWeight, bnTargetPerCoinDay, true, Params().NetworkIDString() != CBaseChainParams::MAIN);
     }
 
     // nHashDrift should be <= MAX_FUTURE_BLOCK_TIME otherwise we risk creating a block which will be rejected due to nTimeTx being too far in the future
@@ -559,7 +576,8 @@ bool CheckStakeKernelHash(const unsigned int& nBits, const CBlockIndex* pindexPr
         hashProofOfStake = stakeHash(nTryTime, ss, prevout.n, prevout.hash, nTimeBlockFrom, true);
 
         // If stake hash does not meet the target then continue to next iteration
-        if (!stakeTargetHit(hashProofOfStake, nValueIn, bnTargetPerCoinDay, true))
+        nTimeWeight = CalculateTimeWeight(nTimeTx, nTimeBlockFrom, nStakeMinAge, nStakeMaxAge, nMinTimeWeight);
+        if (!stakeTargetHit(hashProofOfStake, nValueIn, nTimeWeight, bnTargetPerCoinDay, true, Params().NetworkIDString() != CBaseChainParams::MAIN))
             continue;
 
         fSuccess = true; // If we make it this far then we have successfully created a stake hash
@@ -618,10 +636,10 @@ bool CheckProofOfStake(BlockValidationState& state, const CCoinsViewCache& view,
     {
         int nIn = 0;
         //const CTxOut& prevTxOut = txPrev->vout[tx->vin[nIn].prevout.n];
-        TransactionSignatureChecker checker(&(*tx), nIn, coin.out.nValue, PrecomputedTransactionData(*tx));
+        TransactionSignatureChecker checker(&(*tx), nIn, coin.out.nValue, &::ChainActive(), PrecomputedTransactionData(*tx));
         ScriptError serror = SCRIPT_ERR_OK;
 
-        if (!VerifyScript(tx->vin[nIn].scriptSig, coin.out.scriptPubKey, &(tx->vin[nIn].scriptWitness), STANDARD_SCRIPT_VERIFY_FLAGS, checker, &serror))
+        if (!VerifyScript(tx->vin[nIn].scriptSig, coin.out.scriptPubKey, &(tx->vin[nIn].scriptWitness), STANDARD_CONTEXTUAL_SCRIPT_VERIFY_FLAGS, checker, &serror))
             return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "invalid-pos-script", strprintf("%s: VerifyScript failed on coinstake %s, %s", __func__, tx->GetHash().ToString(), ScriptErrorString(serror)));
     }
 

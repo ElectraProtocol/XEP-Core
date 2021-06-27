@@ -152,11 +152,6 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     coinbaseTx.vout.resize(1);
     coinbaseTx.vout[0].scriptPubKey = scriptPubKeyIn;
 
-    if (!fProofOfStake) {
-        coinbaseTx.vout[0].nValue = /* nFees + */ GetBlockSubsidy(nHeight, false, 0, consensusParams);
-        FillTreasuryPayee(coinbaseTx, nHeight, consensusParams);
-    }
-
     // Add dummy coinbase tx as first transaction
     pblocktemplate->entries.emplace_back(CTransactionRef(), -1, -1); // updated at end
 
@@ -220,7 +215,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
         CMutableTransaction coinstakeTx;
         int64_t nSearchTime = GetAdjustedTime(); // search to current time
         if (nSearchTime > nLastCoinStakeSearchTime) {
-            if (CreateCoinStake(coinstakeTx, pblock, pwallet, nHeight, pindexPrev, consensusParams)) {
+            if (CreateCoinStake(coinstakeTx, pblock, pwallet, nFees, nHeight, pindexPrev, consensusParams)) {
                 coinbaseTx.vout[0].SetEmpty();
                 pblocktemplate->entries[1].tx = MakeTransactionRef(std::move(coinstakeTx));
                 pblock->vtx[1] = pblocktemplate->entries[1].tx;
@@ -238,6 +233,10 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     m_last_block_num_txs = nBlockTx;
     m_last_block_weight = nBlockWeight;
 
+    if (!fProofOfStake) {
+        coinbaseTx.vout[0].nValue = GetBlockSubsidy(nHeight, false, 0, consensusParams) + (chainparams.NetworkIDString() != CBaseChainParams::MAIN ? nFees / 2 : 0);
+        FillTreasuryPayee(coinbaseTx, nHeight, consensusParams);
+    }
     coinbaseTx.vin[0].scriptSig = CScript() << nHeight << OP_0;
     pblocktemplate->entries[0].tx = MakeTransactionRef(std::move(coinbaseTx));
     pblock->vtx[0] = pblocktemplate->entries[0].tx;
@@ -537,16 +536,19 @@ void IncrementExtraNonce(CBlock* pblock, const CBlockIndex* pindexPrev, unsigned
 }
 
 
-bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shared_ptr<CWallet> pwallet, const int& nHeight, const CBlockIndex* pindexPrev, const Consensus::Params& consensusParams)
+bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shared_ptr<CWallet> pwallet, const CAmount& nFees, const int& nHeight, const CBlockIndex* pindexPrev, const Consensus::Params& consensusParams)
 {
     AssertLockHeld(pwallet->cs_wallet);
 
+    const int nTargetStakeInputs = gArgs.GetArg("-targetstakeinputs", DEFAULT_TARGET_STAKE_INPUTS);
+    const CAmount nAutomaticInputSize = 2000000 * COIN;
     bool fKernelFound = false;
     std::set<CInputCoin> setCoins;
-    if (pwallet->SelectStakeCoins(setCoins)) {
+    if (pwallet->SelectStakeCoins(setCoins, false)) {
         while ((pblock->nTime & consensusParams.nStakeTimestampMask) != 0)
             pblock->nTime++;
 
+        const int nMatureInputs = setCoins.size();
         CAmount nCredit = 0;
         CScript scriptPubKeyKernel;
         for (const auto& pcoin : setCoins) {
@@ -596,20 +598,19 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                 if (gArgs.GetBoolArg("-debug", false) && gArgs.GetBoolArg("-printcoinstake", false))
                     LogPrintf("%s : parsed kernel type=%s\n", __func__, GetTxnOutputType(whichType));
 
-                if (whichType == TxoutType::PUBKEY || whichType == TxoutType::PUBKEYHASH || whichType == TxoutType::WITNESS_V0_KEYHASH || whichType == TxoutType::SCRIPTHASH || whichType == TxoutType::WITNESS_V0_SCRIPTHASH) { // we support p2pkh, p2wpkh, p2sh-p2wpkh, and p2sh/p2wsh-multisig inputs
-                    const bool fNewStakingCodeActive = nHeight >= consensusParams.nMandatoryUpgradeBlock;
+                if (whichType == TxoutType::PUBKEY || whichType == TxoutType::PUBKEY_REPLAY || whichType == TxoutType::PUBKEY_DATA_REPLAY || whichType == TxoutType::PUBKEYHASH || whichType == TxoutType::PUBKEYHASH_REPLAY ||
+                    whichType == TxoutType::WITNESS_V0_KEYHASH || whichType == TxoutType::SCRIPTHASH || whichType == TxoutType::SCRIPTHASH_REPLAY || whichType == TxoutType::WITNESS_V0_SCRIPTHASH) { // we support p2pkh, p2wpkh, p2sh-p2wpkh, and p2sh/p2wsh-multisig inputs
                     if (whichType == TxoutType::SCRIPTHASH || whichType == TxoutType::WITNESS_V0_SCRIPTHASH) { // a p2sh/p2wsh input could be many things, but we only support p2sh-p2wpkh and multisig for now
                         CScript subscript;
                         std::unique_ptr<SigningProvider> provider = pwallet->GetSolvingProvider(scriptPubKeyKernel);
                         uint160 hash;
                         if (whichType == TxoutType::WITNESS_V0_SCRIPTHASH) {
-                            CRIPEMD160 hasher;
-                            hasher.Write(&vSolutions[0][0], 32).Finalize(hash.begin());
+                            CRIPEMD160().Write(&vSolutions[0][0], 32).Finalize(hash.begin());
                         } else // whichType == TxoutType::SCRIPTHASH
                             hash = uint160(vSolutions[0]);
                         if (provider && provider->GetCScript(CScriptID(hash), subscript)) { // extract the redeem script
                             TxoutType scriptType = Solver(subscript, vSolutions);
-                            if (!fNewStakingCodeActive || (scriptType != TxoutType::WITNESS_V0_KEYHASH && scriptType != TxoutType::MULTISIG && scriptType != TxoutType::MULTISIG_DATA)) { // this is a script we don't recognize
+                            if (scriptType != TxoutType::WITNESS_V0_KEYHASH && scriptType != TxoutType::MULTISIG && scriptType != TxoutType::MULTISIG_REPLAY && scriptType != TxoutType::MULTISIG_DATA && scriptType != TxoutType::MULTISIG_DATA_REPLAY) { // this is a script we don't recognize
                                 if (gArgs.GetBoolArg("-debug", false) && gArgs.GetBoolArg("-printcoinstake", false))
                                     LogPrintf("%s : no support for %s kernel type=%s\n", __func__, GetTxnOutputType(whichType), GetTxnOutputType(scriptType));
                                 continue;
@@ -622,7 +623,7 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                         }
                     }
 
-                    if ((fNewStakingCodeActive || whichType != TxoutType::PUBKEY) && gArgs.GetBoolArg("-quantumsafestaking", false)) { // a new bech32 address is generated for every stake to protect the public key from quantum computers
+                    if (gArgs.GetBoolArg("-quantumsafestaking", false)) { // a new bech32 address is generated for every stake to protect the public key from quantum computers
                         OutputType output_type = OutputType::BECH32;
                         CTxDestination dest;
                         std::string error;
@@ -633,7 +634,7 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                             LogPrintf("%s : failed to get new destination for coinstake (%s)\n", __func__, error);
                             scriptPubKeyOut = scriptPubKeyKernel;
                         }
-                    } else if (whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_DATA) { // try to create a new destination for p2sh/p2wsh-multisig inputs
+                    } else if (whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_REPLAY || whichType == TxoutType::MULTISIG_DATA || whichType == TxoutType::MULTISIG_DATA_REPLAY) { // try to create a new destination for p2sh/p2wsh-multisig inputs
                         OutputType output_type = OutputType::BECH32;
                         CTxDestination dest;
                         std::string error;
@@ -642,6 +643,12 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                             scriptPubKeyOut = GetScriptForDestination(dest);
                         } else
                             continue;
+                    } else if (whichType == TxoutType::PUBKEY_REPLAY || whichType == TxoutType::PUBKEY_DATA_REPLAY) {
+                        scriptPubKeyOut << vSolutions[0] << OP_CHECKSIG;
+                    } else if (whichType == TxoutType::PUBKEYHASH_REPLAY) {
+                        scriptPubKeyOut << OP_DUP << OP_HASH160 << vSolutions[0] << OP_EQUALVERIFY << OP_CHECKSIG;
+                    } else if (whichType == TxoutType::SCRIPTHASH_REPLAY) {
+                        scriptPubKeyOut << OP_HASH160 << vSolutions[0] << OP_EQUAL;
                     } else if (pwallet->IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS) || whichType == TxoutType::PUBKEY) { // descriptor wallets only credit earnings back to the original address and p2pk inputs can be left alone
                         scriptPubKeyOut = scriptPubKeyKernel;
                     } else { // on legacy wallets we can convert every input to p2pk for smaller coinstake TXs
@@ -655,7 +662,7 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                         }
                         scriptPubKeyOut << ToByteVector(pubkey) << OP_CHECKSIG;
                     }
-                } else if (!pwallet->IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS) && (whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_DATA)) { // convert multisig to p2pk
+                } else if (!pwallet->IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS) && (whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_REPLAY || whichType == TxoutType::MULTISIG_DATA || whichType == TxoutType::MULTISIG_DATA_REPLAY)) { // convert multisig to p2pk
                     // convert to pay to public key type
                     CPubKey pubkey;
                     bool found = false;
@@ -679,6 +686,29 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
 
                 coinstakeTx.vin.push_back(CTxIn(prevout.hash, prevout.n));
                 nCredit += pcoin.txout.nValue;
+                int nTotalInputs = 0;
+                if (nTargetStakeInputs >= 0) {
+                    bool fCombineAllInputs = false;
+                    if (nTargetStakeInputs > 0) {
+                        int nImmatureInputs = 0;
+                        std::set<CInputCoin> setImmatureCoins;
+                        if (pwallet->SelectStakeCoins(setImmatureCoins, true)) {
+                            nImmatureInputs = setImmatureCoins.size();
+                        }
+                        nTotalInputs = nMatureInputs + nImmatureInputs;
+                        fCombineAllInputs = nTotalInputs > nTargetStakeInputs;
+                    }
+
+                    for (const auto& pcoinInput : setCoins) {
+                        if (pcoinInput != pcoin) {
+                            if (fCombineAllInputs || pcoinInput.txout.nValue < pcoin.txout.nValue / 2 || (nTargetStakeInputs == 0 && (pcoinInput.txout.nValue < nAutomaticInputSize || pcoinInput.txout.nValue >= 2*nAutomaticInputSize))) {
+                                coinstakeTx.vin.push_back(CTxIn(pcoinInput.outpoint.hash, pcoinInput.outpoint.n));
+                                nCredit += pcoinInput.txout.nValue;
+                                //LogPrintf("%s : adding stake input %u\n", __func__, coinstakeTx.vin.size());
+                            }
+                        }
+                    }
+                }
                 coinstakeTx.vout.push_back(CTxOut(0, CScript()));
                 if (gArgs.GetBoolArg("-debug", false) && gArgs.GetBoolArg("-printcoinstake", false))
                     LogPrintf("%s : added kernel type=%s\n", __func__, GetTxnOutputType(whichType));
@@ -687,12 +717,20 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                 if (!GetCoinAge((const CTransaction)coinstakeTx, view, pblock->nTime, nHeight, nCoinAge))
                     return error("%s : failed to calculate coin age", __func__);
 
-                CAmount nReward = GetBlockSubsidy(nHeight, true, nCoinAge, consensusParams);
+                const CAmount nReward = GetBlockSubsidy(nHeight, true, nCoinAge, consensusParams) + (Params().NetworkIDString() != CBaseChainParams::MAIN ? nFees / 2 : 0);
                 // Refuse to create mint that has zero or negative reward
                 if (nReward < 0)
                     return error("%s : not creating mint with negative subsidy", __func__);
                 nCredit += nReward;
-                coinstakeTx.vout.push_back(CTxOut(nCredit, scriptPubKeyOut));
+                unsigned int outputs = 1;
+                if (nTargetStakeInputs > 0) {
+                    outputs = std::max(int(coinstakeTx.vin.size()) + nTargetStakeInputs - nTotalInputs, 1);
+                } else if (nTargetStakeInputs == 0) {
+                    outputs = std::max(nCredit / nAutomaticInputSize, static_cast<int64_t>(1));
+                }
+                for (unsigned int i = 0; i < outputs; i++) {
+                    coinstakeTx.vout.push_back(CTxOut(nCredit / outputs, scriptPubKeyOut));
+                }
 
                 // Add treasury payment
                 FillTreasuryPayee(coinstakeTx, nHeight, consensusParams);
@@ -746,7 +784,7 @@ static inline void PoSMiner(std::shared_ptr<CWallet> pwallet, ChainstateManager*
         LogPrintf("Set proof-of-stake timeout: %ums for %u UTXOs\n", pos_timio, vCoins.size());
     }
 
-    const std::string strMintWalletMessage = _("Info: Minting suspended due to locked wallet.").translated;
+    const std::string strMintWalletMessage = _("Info: Minting suspended on one or more locked wallets.").translated;
     const std::string strMintSyncMessage = _("Info: Minting suspended while synchronizing wallet.").translated;
     const std::string strMintDisabledMessage = _("Info: Minting disabled by 'nostaking' option.").translated;
     const std::string strMintBlockMessage = _("Info: Minting suspended due to block creation failure.").translated;

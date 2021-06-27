@@ -361,7 +361,7 @@ void CWallet::UpgradeKeyMetadata()
     SetWalletFlag(WALLET_FLAG_KEY_ORIGIN_METADATA);
 }
 
-bool CWallet::Unlock(const SecureString& strWalletPassphrase, bool accept_no_keys)
+bool CWallet::Unlock(const SecureString& strWalletPassphrase, bool fAskingForPassword, bool accept_no_keys)
 {
     CCrypter crypter;
     CKeyingMaterial _vMasterKey;
@@ -374,7 +374,7 @@ bool CWallet::Unlock(const SecureString& strWalletPassphrase, bool accept_no_key
                 return false;
             if (!crypter.Decrypt(pMasterKey.second.vchCryptedKey, _vMasterKey))
                 continue; // try another master key
-            if (Unlock(_vMasterKey, accept_no_keys)) {
+            if (Unlock(_vMasterKey, fAskingForPassword, accept_no_keys)) {
                 // Now that we've unlocked, upgrade the key metadata
                 UpgradeKeyMetadata();
                 return true;
@@ -2205,7 +2205,7 @@ CAmount CWallet::GetAvailableBalance(const CCoinControl* coinControl) const
     return balance;
 }
 
-void CWallet::AvailableCoins(std::vector<COutput>& vCoins, bool fOnlySafe, const CCoinControl* coinControl, const CAmount& nMinimumAmount, const CAmount& nMaximumAmount, const CAmount& nMinimumSumAmount, const uint64_t nMaximumCount) const
+void CWallet::AvailableCoins(std::vector<COutput>& vCoins, bool fOnlySafe, const CCoinControl* coinControl, const CAmount& nMinimumAmount, const CAmount& nMaximumAmount, const CAmount& nMinimumSumAmount, const uint64_t nMaximumCount, const bool fOnlyImmature) const
 {
     AssertLockHeld(cs_wallet);
 
@@ -2227,7 +2227,7 @@ void CWallet::AvailableCoins(std::vector<COutput>& vCoins, bool fOnlySafe, const
             continue;
         }
 
-        if (wtx.IsImmatureCoinBase())
+        if ((!fOnlyImmature && wtx.IsImmatureCoinBase()) || (fOnlyImmature && !wtx.IsImmatureCoinBase()))
             continue;
 
         int nDepth = wtx.GetDepthInMainChain();
@@ -2399,14 +2399,8 @@ bool CWallet::SelectCoinsMinConf(const CAmount& nTargetValue, const CoinEligibil
 
     std::vector<OutputGroup> utxo_pool;
     if (coin_selection_params.use_bnb) {
-        // Get long term estimate
-        FeeCalculation feeCalc;
-        CCoinControl temp;
-        temp.m_confirm_target = 1008;
-        CFeeRate long_term_feerate = GetMinimumFeeRate(*this, temp, &feeCalc);
-
         // Calculate cost of change
-        CAmount cost_of_change = GetDiscardRate(*this).GetFee(coin_selection_params.change_spend_size) + coin_selection_params.effective_fee.GetFee(coin_selection_params.change_output_size);
+        CAmount cost_of_change = coin_selection_params.m_discard_feerate.GetFee(coin_selection_params.change_spend_size) + coin_selection_params.m_effective_feerate.GetFee(coin_selection_params.change_output_size);
 
         // Filter by the min conf specs and add to utxo_pool and calculate effective value
         for (OutputGroup& group : groups) {
@@ -2414,16 +2408,16 @@ bool CWallet::SelectCoinsMinConf(const CAmount& nTargetValue, const CoinEligibil
 
             if (coin_selection_params.m_subtract_fee_outputs) {
                 // Set the effective feerate to 0 as we don't want to use the effective value since the fees will be deducted from the output
-                group.SetFees(CFeeRate(0) /* effective_feerate */, long_term_feerate);
+                group.SetFees(CFeeRate(0) /* effective_feerate */, coin_selection_params.m_long_term_feerate);
             } else {
-                group.SetFees(coin_selection_params.effective_fee, long_term_feerate);
+                group.SetFees(coin_selection_params.m_effective_feerate, coin_selection_params.m_long_term_feerate);
             }
 
             OutputGroup pos_group = group.GetPositiveOnlyGroup();
             if (pos_group.effective_value > 0) utxo_pool.push_back(pos_group);
         }
         // Calculate the fees for things that aren't inputs
-        CAmount not_input_fees = coin_selection_params.effective_fee.GetFee(coin_selection_params.tx_noinputs_size);
+        CAmount not_input_fees = coin_selection_params.m_effective_feerate.GetFee(coin_selection_params.tx_noinputs_size);
         bnb_used = true;
         return SelectCoinsBnB(utxo_pool, nTargetValue, cost_of_change, setCoinsRet, nValueRet, not_input_fees);
     } else {
@@ -2480,7 +2474,7 @@ bool CWallet::SelectCoins(const std::vector<COutput>& vAvailableCoins, const CAm
             if (coin.m_input_bytes <= 0) {
                 return false; // Not solvable, can't estimate size for fee
             }
-            coin.effective_value = coin.txout.nValue - coin_selection_params.effective_fee.GetFee(coin.m_input_bytes);
+            coin.effective_value = coin.txout.nValue - coin_selection_params.m_effective_feerate.GetFee(coin.m_input_bytes);
             if (coin_selection_params.use_bnb) {
                 value_to_select -= coin.effective_value;
             } else {
@@ -2848,16 +2842,27 @@ bool CWallet::CreateTransactionInternal(
             CTxOut change_prototype_txout(0, scriptChange);
             coin_selection_params.change_output_size = GetSerializeSize(change_prototype_txout);
 
-            CFeeRate discard_rate = GetDiscardRate(*this);
+            // Set discard feerate
+            coin_selection_params.m_discard_feerate = GetDiscardRate(*this);
 
             // Get the fee rate to use effective values in coin selection
-            CFeeRate nFeeRateNeeded = GetMinimumFeeRate(*this, coin_control, &feeCalc);
+            coin_selection_params.m_effective_feerate = GetMinimumFeeRate(*this, coin_control, &feeCalc);
             // Do not, ever, assume that it's fine to change the fee rate if the user has explicitly
             // provided one
-            if (coin_control.m_feerate && nFeeRateNeeded > *coin_control.m_feerate) {
-                error = strprintf(_("Fee rate (%s) is lower than the minimum fee rate setting (%s)"), coin_control.m_feerate->ToString(FeeEstimateMode::SAT_VB), nFeeRateNeeded.ToString(FeeEstimateMode::SAT_VB));
+            if (coin_control.m_feerate && coin_selection_params.m_effective_feerate > *coin_control.m_feerate) {
+                error = strprintf(_("Fee rate (%s) is lower than the minimum fee rate setting (%s)"), coin_control.m_feerate->ToString(FeeEstimateMode::SAT_VB), coin_selection_params.m_effective_feerate.ToString(FeeEstimateMode::SAT_VB));
                 return false;
             }
+            if (feeCalc.reason == FeeReason::FALLBACK && !m_allow_fallback_fee) {
+                // eventually allow a fallback fee
+                error = _("Fee estimation failed. Fallbackfee is disabled. Wait a few blocks or enable -fallbackfee.");
+                return false;
+            }
+
+            // Get long term estimate
+            CCoinControl cc_temp;
+            cc_temp.m_confirm_target = chain().estimateMaxBlocks();
+            coin_selection_params.m_long_term_feerate = GetMinimumFeeRate(*this, cc_temp, nullptr);
 
             nFeeRet = 0;
             bool pick_new_inputs = true;
@@ -2932,7 +2937,6 @@ bool CWallet::CreateTransactionInternal(
                     } else {
                         coin_selection_params.change_spend_size = (size_t)change_spend_size;
                     }
-                    coin_selection_params.effective_fee = nFeeRateNeeded;
                     if (!SelectCoins(vAvailableCoins, nValueToSelect, setCoins, nValueIn, coin_control, coin_selection_params, bnb_used))
                     {
                         // If BnB was used, it was the first pass. No longer the first pass and continue loop with knapsack.
@@ -2958,7 +2962,7 @@ bool CWallet::CreateTransactionInternal(
                     // Never create dust outputs; if we would, just
                     // add the dust to the fee.
                     // The nChange when BnB is used is always going to go to fees.
-                    if (IsDust(newTxOut, discard_rate) || bnb_used)
+                    if (IsDust(newTxOut, coin_selection_params.m_discard_feerate) || bnb_used)
                     {
                         nChangePosInOut = -1;
                         nFeeRet += nChange;
@@ -2995,13 +2999,7 @@ bool CWallet::CreateTransactionInternal(
                     return false;
                 }
 
-                nFeeNeeded = GetMinimumFee(*this, nBytes, coin_control, &feeCalc);
-                if (feeCalc.reason == FeeReason::FALLBACK && !m_allow_fallback_fee) {
-                    // eventually allow a fallback fee
-                    error = _("Fee estimation failed. Fallbackfee is disabled. Wait a few blocks or enable -fallbackfee.");
-                    return false;
-                }
-
+                nFeeNeeded = coin_selection_params.m_effective_feerate.GetFee(nBytes);
                 if (nFeeRet >= nFeeNeeded) {
                     // Reduce fee to only the needed amount if possible. This
                     // prevents potential overpayment in fees if the coins
@@ -3015,8 +3013,8 @@ bool CWallet::CreateTransactionInternal(
                     // change output. Only try this once.
                     if (nChangePosInOut == -1 && nSubtractFeeFromAmount == 0 && pick_new_inputs) {
                         unsigned int tx_size_with_change = nBytes + coin_selection_params.change_output_size + 2; // Add 2 as a buffer in case increasing # of outputs changes compact size
-                        CAmount fee_needed_with_change = GetMinimumFee(*this, tx_size_with_change, coin_control, nullptr);
-                        CAmount minimum_value_for_change = GetDustThreshold(change_prototype_txout, discard_rate);
+                        CAmount fee_needed_with_change = coin_selection_params.m_effective_feerate.GetFee(tx_size_with_change);
+                        CAmount minimum_value_for_change = GetDustThreshold(change_prototype_txout, coin_selection_params.m_discard_feerate);
                         if (nFeeRet >= fee_needed_with_change + minimum_value_for_change) {
                             pick_new_inputs = false;
                             nFeeRet = fee_needed_with_change;
@@ -4291,21 +4289,27 @@ bool CWallet::IsLocked() const
     return vMasterKey.empty();
 }
 
-bool CWallet::Lock()
+bool CWallet::Lock(bool fAskingForPassword)
 {
     if (!IsCrypted())
         return false;
+
+    if (fAskingForPassword) {
+        SetUnlockedAskingForPassword(true);
+        return true;
+    }
 
     {
         LOCK(cs_wallet);
         vMasterKey.clear();
     }
+    SetUnlockedAskingForPassword(false);
 
     NotifyStatusChanged(this);
     return true;
 }
 
-bool CWallet::Unlock(const CKeyingMaterial& vMasterKeyIn, bool accept_no_keys)
+bool CWallet::Unlock(const CKeyingMaterial& vMasterKeyIn, bool fAskingForPassword, bool accept_no_keys)
 {
     {
         LOCK(cs_wallet);
@@ -4316,6 +4320,7 @@ bool CWallet::Unlock(const CKeyingMaterial& vMasterKeyIn, bool accept_no_keys)
         }
         vMasterKey = vMasterKeyIn;
     }
+    SetUnlockedAskingForPassword(fAskingForPassword);
     NotifyStatusChanged(this);
     return true;
 }
@@ -4606,19 +4611,25 @@ ScriptPubKeyMan* CWallet::AddWalletDescriptor(WalletDescriptor& desc, const Flat
     return ret;
 }
 
-bool CWallet::SelectStakeCoins(std::set<CInputCoin>& setCoins) const
+bool CWallet::SelectStakeCoins(std::set<CInputCoin>& setCoins, const bool fOnlyImmature) const
 {
     AssertLockHeld(cs_wallet);
 
     // Choose coins to use
-    CAmount nBalance = GetBalance().m_mine_trusted;
+    const Balance& bal = GetBalance();
+    CAmount nBalance = 0;
+    if (!fOnlyImmature) {
+        nBalance = bal.m_mine_trusted;
+    } else {
+        nBalance = bal.m_mine_immature;
+    }
     CAmount nValueIn = 0;
     std::vector<COutput> vAvailableCoins;
     CCoinControl temp;
     CoinSelectionParams coin_selection_params;
     coin_selection_params.use_bnb=false;
     bool bnb_used;
-    AvailableCoins(vAvailableCoins, true, &temp, 1, MAX_MONEY, MAX_MONEY, 0);
+    AvailableCoins(vAvailableCoins, true, &temp, 1, MAX_MONEY, MAX_MONEY, 0, fOnlyImmature);
 
     if (!SelectCoins(vAvailableCoins, nBalance, setCoins, nValueIn, temp, coin_selection_params, bnb_used))
         return false;
@@ -4649,30 +4660,29 @@ bool CWallet::GetBlockSigningPubKey(const CBlock& block, CPubKey& pubkey, bool& 
     }
     TxoutType whichType = Solver(scriptPubKey, vSolutions);
 
-    if (whichType == TxoutType::PUBKEY) {
+    if (whichType == TxoutType::PUBKEY || whichType == TxoutType::PUBKEY_REPLAY || whichType == TxoutType::PUBKEY_DATA_REPLAY) {
         pubkey = CPubKey(vSolutions[0]);
-    } else if (whichType == TxoutType::PUBKEYHASH || whichType == TxoutType::WITNESS_V0_KEYHASH) {
+    } else if (whichType == TxoutType::PUBKEYHASH || whichType == TxoutType::PUBKEYHASH_REPLAY || whichType == TxoutType::WITNESS_V0_KEYHASH) {
         std::unique_ptr<SigningProvider> provider = GetSolvingProvider(scriptPubKey);
         if (!provider || !provider->GetPubKey(CKeyID(uint160(vSolutions[0])), pubkey))
             return false;
-    } else if (whichType == TxoutType::SCRIPTHASH || whichType == TxoutType::WITNESS_V0_SCRIPTHASH) {
+    } else if (whichType == TxoutType::SCRIPTHASH || whichType == TxoutType::SCRIPTHASH_REPLAY || whichType == TxoutType::WITNESS_V0_SCRIPTHASH) {
         CScript subscript;
         std::unique_ptr<SigningProvider> provider = GetSolvingProvider(scriptPubKey);
         uint160 hash;
         if (whichType == TxoutType::WITNESS_V0_SCRIPTHASH) {
-            CRIPEMD160 hasher;
-            hasher.Write(&vSolutions[0][0], 32).Finalize(hash.begin());
+            CRIPEMD160().Write(&vSolutions[0][0], 32).Finalize(hash.begin());
         } else // whichType == TxoutType::SCRIPTHASH
             hash = uint160(vSolutions[0]);
         if (provider && provider->GetCScript(CScriptID(hash), subscript)) {
             TxoutType scriptType = Solver(subscript, vSolutions);
-            if (fProofOfStake && (scriptType == TxoutType::MULTISIG || scriptType == TxoutType::MULTISIG_DATA))
+            if (fProofOfStake && (scriptType == TxoutType::MULTISIG || scriptType == TxoutType::MULTISIG_REPLAY || scriptType == TxoutType::MULTISIG_DATA || scriptType == TxoutType::MULTISIG_DATA_REPLAY))
                 whichType = scriptType; // pubkey is retrieved from PoS output below
             else if (scriptType != TxoutType::WITNESS_V0_KEYHASH || !provider->GetPubKey(CKeyID(uint160(vSolutions[0])), pubkey))
                 return false;
         } else
             return false;
-    } else if (whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_DATA) {
+    } else if (whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_REPLAY || whichType == TxoutType::MULTISIG_DATA || whichType == TxoutType::MULTISIG_DATA_REPLAY) {
         if (vSolutions.size() != 3 || vSolutions.front()[0] != 1 || vSolutions.back()[0] != 1)
             return false;
         pubkey = CPubKey(vSolutions[1]);
@@ -4687,7 +4697,7 @@ bool CWallet::GetBlockSigningPubKey(const CBlock& block, CPubKey& pubkey, bool& 
         if (outputType == TxoutType::PUBKEY) { // pubkey is revealed in p2pk output
             pubkey = CPubKey(vSolutions[0]); // use pubkey from output rather than input
             pubkeyInSig = true;
-        } else if (whichType == TxoutType::PUBKEY || whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_DATA) { // p2pk and multisig PoS inputs don't place the pubkey in the scriptSig
+        } else if (whichType == TxoutType::PUBKEY || whichType == TxoutType::PUBKEY_REPLAY || whichType == TxoutType::PUBKEY_DATA_REPLAY || whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_REPLAY || whichType == TxoutType::MULTISIG_DATA || whichType == TxoutType::MULTISIG_DATA_REPLAY) { // p2pk and multisig PoS inputs don't place the pubkey in the scriptSig
             pubkeyInSig = false;
             if (outputType == TxoutType::PUBKEYHASH || outputType == TxoutType::WITNESS_V0_KEYHASH) {
                 std::unique_ptr<SigningProvider> provider = GetSolvingProvider(txout.scriptPubKey);

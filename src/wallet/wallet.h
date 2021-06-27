@@ -78,7 +78,7 @@ static const CAmount DEFAULT_MAX_AVOIDPARTIALSPEND_FEE = 0;
 //! discourage APS fee higher than this amount
 constexpr CAmount HIGH_APS_FEE{COIN / 100}; // 10 * DEFAULT_TRANSACTION_MINFEE
 //! minimum recommended increment for BIP 125 replacement txs
-static const CAmount WALLET_INCREMENTAL_RELAY_FEE = 500000; // 5 * DEFAULT_TRANSACTION_MINFEE
+static const CAmount WALLET_INCREMENTAL_RELAY_FEE = 5000; // would be 5 * DEFAULT_TRANSACTION_MINFEE but left at default value
 //! Default for -spendzeroconfchange
 static const bool DEFAULT_SPEND_ZEROCONF_CHANGE = true;
 //! Default for -walletrejectlongchains
@@ -607,12 +607,23 @@ struct CoinSelectionParams
     bool use_bnb = true;
     size_t change_output_size = 0;
     size_t change_spend_size = 0;
-    CFeeRate effective_fee = CFeeRate(0);
+    CFeeRate m_effective_feerate;
+    CFeeRate m_long_term_feerate;
+    CFeeRate m_discard_feerate;
     size_t tx_noinputs_size = 0;
     //! Indicate that we are subtracting the fee from outputs
     bool m_subtract_fee_outputs = false;
 
-    CoinSelectionParams(bool use_bnb, size_t change_output_size, size_t change_spend_size, CFeeRate effective_fee, size_t tx_noinputs_size) : use_bnb(use_bnb), change_output_size(change_output_size), change_spend_size(change_spend_size), effective_fee(effective_fee), tx_noinputs_size(tx_noinputs_size) {}
+    CoinSelectionParams(bool use_bnb, size_t change_output_size, size_t change_spend_size, CFeeRate effective_feerate,
+                        CFeeRate long_term_feerate, CFeeRate discard_feerate, size_t tx_noinputs_size) :
+        use_bnb(use_bnb),
+        change_output_size(change_output_size),
+        change_spend_size(change_spend_size),
+        m_effective_feerate(effective_feerate),
+        m_long_term_feerate(long_term_feerate),
+        m_discard_feerate(discard_feerate),
+        tx_noinputs_size(tx_noinputs_size)
+    {}
     CoinSelectionParams() {}
 };
 
@@ -626,13 +637,15 @@ private:
     CKeyingMaterial vMasterKey GUARDED_BY(cs_wallet);
 
 
-    bool Unlock(const CKeyingMaterial& vMasterKeyIn, bool accept_no_keys = false);
+    bool Unlock(const CKeyingMaterial& vMasterKeyIn, bool fAskingForPassword = false, bool accept_no_keys = false);
 
     std::atomic<bool> fAbortRescan{false};
     std::atomic<bool> fScanningWallet{false}; // controlled by WalletRescanReserver
     std::atomic<int64_t> m_scanning_start{0};
     std::atomic<double> m_scanning_progress{0};
     friend class WalletRescanReserver;
+
+    std::atomic<bool> fUnlockedAskingForPassword{false};
 
     //! the current wallet version: clients below this version are not able to load the wallet
     int nWalletVersion GUARDED_BY(cs_wallet){FEATURE_BASE};
@@ -771,7 +784,9 @@ public:
 
     bool IsCrypted() const;
     bool IsLocked() const override;
-    bool Lock();
+    bool IsUnlockedAskingForPassword() const { return fUnlockedAskingForPassword; }
+    bool Lock(bool fAskingForPassword = false);
+    void SetUnlockedAskingForPassword(bool value) { fUnlockedAskingForPassword = value; }
 
     /** Interface to assert chain access */
     bool HaveChain() const { return m_chain ? true : false; }
@@ -804,7 +819,7 @@ public:
     /**
      * populate vCoins with vector of available COutputs.
      */
-    void AvailableCoins(std::vector<COutput>& vCoins, bool fOnlySafe = true, const CCoinControl* coinControl = nullptr, const CAmount& nMinimumAmount = 1, const CAmount& nMaximumAmount = MAX_MONEY, const CAmount& nMinimumSumAmount = MAX_MONEY, const uint64_t nMaximumCount = 0) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+    void AvailableCoins(std::vector<COutput>& vCoins, bool fOnlySafe = true, const CCoinControl* coinControl = nullptr, const CAmount& nMinimumAmount = 1, const CAmount& nMaximumAmount = MAX_MONEY, const CAmount& nMinimumSumAmount = MAX_MONEY, const uint64_t nMaximumCount = 0, const bool fOnlyImmature = false) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
 
     /**
      * Return list of available coins and locked coins grouped by non-change output address.
@@ -872,7 +887,7 @@ public:
 
     // Used to prevent concurrent calls to walletpassphrase RPC.
     Mutex m_unlock_mutex;
-    bool Unlock(const SecureString& strWalletPassphrase, bool accept_no_keys = false);
+    bool Unlock(const SecureString& strWalletPassphrase, bool fAskingForPassword = false, bool accept_no_keys = false);
     bool ChangeWalletPassphrase(const SecureString& strOldWalletPassphrase, const SecureString& strNewWalletPassphrase);
     bool EncryptWallet(const SecureString& strWalletPassphrase);
 
@@ -983,7 +998,7 @@ public:
      * @param[in] orderForm BIP 70 / BIP 21 order form details to be set on the transaction.
      */
     void CommitTransaction(CTransactionRef tx, mapValue_t mapValue, std::vector<std::pair<std::string, std::string>> orderForm);
-    bool SelectStakeCoins(std::set<CInputCoin>& setCoins) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+    bool SelectStakeCoins(std::set<CInputCoin>& setCoins, const bool fOnlyImmature) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     bool GetBlockSigningPubKey(const CBlock& block, CPubKey& pubkey, bool& pubkeyInSig) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     bool SignBlock(CBlock& block, const CPubKey& pubkey) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
 

@@ -99,6 +99,8 @@ IsMineResult IsMineInner(const LegacyScriptPubKeyMan& keystore, const CScript& s
     case TxoutType::WITNESS_V1_TAPROOT:
         break;
     case TxoutType::PUBKEY:
+    case TxoutType::PUBKEY_REPLAY:
+    case TxoutType::PUBKEY_DATA_REPLAY:
         keyID = CPubKey(vSolutions[0]).GetID();
         if (!PermitsUncompressed(sigversion) && vSolutions[0].size() != 33) {
             return IsMineResult::INVALID;
@@ -123,6 +125,7 @@ IsMineResult IsMineInner(const LegacyScriptPubKeyMan& keystore, const CScript& s
         break;
     }
     case TxoutType::PUBKEYHASH:
+    case TxoutType::PUBKEYHASH_REPLAY:
         keyID = CKeyID(uint160(vSolutions[0]));
         if (!PermitsUncompressed(sigversion)) {
             CPubKey pubkey;
@@ -135,6 +138,7 @@ IsMineResult IsMineInner(const LegacyScriptPubKeyMan& keystore, const CScript& s
         }
         break;
     case TxoutType::SCRIPTHASH:
+    case TxoutType::SCRIPTHASH_REPLAY:
     {
         if (sigversion != IsMineSigVersion::TOP) {
             // P2SH inside P2WSH or P2SH is invalid.
@@ -167,7 +171,9 @@ IsMineResult IsMineInner(const LegacyScriptPubKeyMan& keystore, const CScript& s
     }
 
     case TxoutType::MULTISIG:
+    case TxoutType::MULTISIG_REPLAY:
     case TxoutType::MULTISIG_DATA:
+    case TxoutType::MULTISIG_DATA_REPLAY:
     {
         // Never treat bare multisig outputs as ours unless they are a single pubkey (they can still be made watchonly-though)
         if (sigversion == IsMineSigVersion::TOP && (vSolutions.size() != 3 || vSolutions.front()[0] != 1 || vSolutions.back()[0] != 1)) {
@@ -600,7 +606,7 @@ SigningResult LegacyScriptPubKeyMan::SignBlock(CBlock& block, const CPubKey& pub
         return SigningResult::PRIVATE_KEY_NOT_AVAILABLE;
     }
 
-    if (key.Sign(block.GetHash(), block.vchBlockSig, 0)) {
+    if (key.Sign(block.GetHash(), block.vchBlockSig)) {
         return SigningResult::OK;
     }
     return SigningResult::SIGNING_FAILED;
@@ -853,7 +859,8 @@ bool LegacyScriptPubKeyMan::HaveWatchOnly() const
 static bool ExtractPubKey(const CScript &dest, CPubKey& pubKeyOut)
 {
     std::vector<std::vector<unsigned char>> solutions;
-    return Solver(dest, solutions) == TxoutType::PUBKEY &&
+    TxoutType whichType = Solver(dest, solutions);
+    return (whichType == TxoutType::PUBKEY || whichType == TxoutType::PUBKEY_REPLAY || whichType == TxoutType::PUBKEY_DATA_REPLAY) &&
         (pubKeyOut = CPubKey(solutions[0])).IsFullyValid();
 }
 
@@ -1652,10 +1659,26 @@ bool DescriptorScriptPubKeyMan::GetNewDestination(const OutputType type, CTxDest
     }
 }
 
+static CScript StripAdditionalTransactionData(CScript newScript)
+{
+    const unsigned int scriptSize = newScript.size();
+    if (scriptSize >= 29 && scriptSize <= 65 && newScript[0] == OP_DUP && newScript[1] == OP_HASH160 && newScript[2] == 20 && newScript[23] == OP_EQUALVERIFY &&
+        newScript[24] == OP_CHECKSIG && newScript[scriptSize - 2] == OP_CHECKBLOCKATHEIGHTVERIFY && newScript.back() == OP_2DROP) { // TxoutType::PUBKEYHASH_REPLAY
+        newScript = CScript(newScript.begin(), newScript.begin() + 25);
+    } else if (scriptSize >= 27 && scriptSize <= 63 && newScript[0] == OP_HASH160 && newScript[1] == 20 && newScript[22] == OP_EQUAL &&
+               newScript[scriptSize - 2] == OP_CHECKBLOCKATHEIGHTVERIFY && newScript.back() == OP_2DROP) { // TxoutType::SCRIPTHASH_REPLAY
+        newScript = CScript(newScript.begin(), newScript.begin() + 23);
+    } else if (scriptSize >= (CPubKey::COMPRESSED_SIZE + 6) && scriptSize <= (CPubKey::COMPRESSED_SIZE + 125) && newScript[0] == CPubKey::COMPRESSED_SIZE && newScript[CPubKey::COMPRESSED_SIZE + 1] == OP_CHECKSIG &&
+               newScript[scriptSize - 2] == OP_CHECKBLOCKATHEIGHTVERIFY && newScript.back() == OP_2DROP) { // TxoutType::PUBKEY_REPLAY and TxoutType::PUBKEY_DATA_REPLAY
+        newScript = CScript(newScript.begin(), newScript.begin() + CPubKey::COMPRESSED_SIZE + 2);
+    }
+    return newScript;
+}
+
 isminetype DescriptorScriptPubKeyMan::IsMine(const CScript& script) const
 {
     LOCK(cs_desc_man);
-    if (m_map_script_pub_keys.count(script) > 0) {
+    if (m_map_script_pub_keys.count(StripAdditionalTransactionData(script)) > 0) {
         return ISMINE_SPENDABLE;
     }
     return ISMINE_NO;
@@ -1844,7 +1867,7 @@ void DescriptorScriptPubKeyMan::MarkUnusedAddresses(const CScript& script)
 {
     LOCK(cs_desc_man);
     if (IsMine(script)) {
-        int32_t index = m_map_script_pub_keys[script];
+        int32_t index = m_map_script_pub_keys[StripAdditionalTransactionData(script)];
         if (index >= m_wallet_descriptor.next_index) {
             WalletLogPrintf("%s: Detected a used keypool item at index %d, mark all keypool items up to this item as used\n", __func__, index);
             m_wallet_descriptor.next_index = index + 1;
@@ -2009,7 +2032,7 @@ std::unique_ptr<FlatSigningProvider> DescriptorScriptPubKeyMan::GetSigningProvid
     LOCK(cs_desc_man);
 
     // Find the index of the script
-    auto it = m_map_script_pub_keys.find(script);
+    auto it = m_map_script_pub_keys.find(StripAdditionalTransactionData(script));
     if (it == m_map_script_pub_keys.end()) {
         return nullptr;
     }
@@ -2104,7 +2127,7 @@ SigningResult DescriptorScriptPubKeyMan::SignBlock(CBlock& block, const CPubKey&
         return SigningResult::PRIVATE_KEY_NOT_AVAILABLE;
     }
 
-    if (!key.Sign(block.GetHash(), block.vchBlockSig, 0)) {
+    if (!key.Sign(block.GetHash(), block.vchBlockSig)) {
         return SigningResult::SIGNING_FAILED;
     }
     return SigningResult::OK;
