@@ -541,7 +541,7 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
     AssertLockHeld(pwallet->cs_wallet);
 
     const int nTargetStakeInputs = gArgs.GetArg("-targetstakeinputs", DEFAULT_TARGET_STAKE_INPUTS);
-    const CAmount nAutomaticInputSize = 2000000 * COIN;
+    constexpr CAmount nAutomaticInputSize = 2000000 * COIN;
     bool fKernelFound = false;
     std::set<CInputCoin> setCoins;
     if (pwallet->SelectStakeCoins(setCoins, false)) {
@@ -699,11 +699,13 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shar
                         fCombineAllInputs = nTotalInputs > nTargetStakeInputs;
                     }
 
+                    bool fSecondInputAdded = false;
                     for (const auto& pcoinInput : setCoins) {
                         if (pcoinInput != pcoin) {
-                            if (fCombineAllInputs || pcoinInput.txout.nValue < pcoin.txout.nValue / 2 || (nTargetStakeInputs == 0 && (pcoinInput.txout.nValue < nAutomaticInputSize || pcoinInput.txout.nValue >= 2*nAutomaticInputSize))) {
+                            if (fCombineAllInputs || (!fSecondInputAdded && pcoinInput.txout.nValue < pcoin.txout.nValue / 2) || (nTargetStakeInputs == 0 && (pcoinInput.txout.nValue < nAutomaticInputSize || pcoinInput.txout.nValue >= 2*nAutomaticInputSize))) {
                                 coinstakeTx.vin.push_back(CTxIn(pcoinInput.outpoint.hash, pcoinInput.outpoint.n));
                                 nCredit += pcoinInput.txout.nValue;
+                                fSecondInputAdded = true;
                                 //LogPrintf("%s : adding stake input %u\n", __func__, coinstakeTx.vin.size());
                             }
                         }
