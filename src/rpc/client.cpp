@@ -72,6 +72,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "listtransactions", 2, "skip" },
     { "listtransactions", 3, "include_watchonly" },
     { "walletpassphrase", 1, "timeout" },
+    { "walletpassphrase", 2, "disable_sending" },
     { "getblocktemplate", 0, "template_request" },
     { "listsinceblock", 1, "target_confirmations" },
     { "listsinceblock", 2, "include_watchonly" },
