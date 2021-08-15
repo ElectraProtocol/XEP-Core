@@ -61,23 +61,23 @@ public:
     static int GetSigType(unsigned char flag)
     {
         switch (flag & VERSION_SIG_MASK) {
-            case VERSION_SIG_COMPACT:
-                return SIG_COMPACT;
-            case VERSION_SIG_DER:
-                return SIG_DER;
-            default:
-                return -1;
+        case VERSION_SIG_COMPACT:
+            return SIG_COMPACT;
+        case VERSION_SIG_DER:
+            return SIG_DER;
+        default:
+            return -1;
         }
     }
 
     static unsigned char GetSigFlag(int type)
     {
         switch (type) {
-            case SIG_COMPACT:
-                return VERSION_SIG_COMPACT;
-            case SIG_DER:
-            default:
-                return VERSION_SIG_DER;
+        case SIG_COMPACT:
+            return VERSION_SIG_COMPACT;
+        case SIG_DER:
+        default:
+            return VERSION_SIG_DER;
         }
     }
 

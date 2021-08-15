@@ -1197,7 +1197,7 @@ bool ReadBlockFromDisk(CBlock& block, const FlatFilePos& pos, const Consensus::P
     }
 
     // Check the header
-    const int algo = CBlockHeader::GetAlgo(block.nVersion);
+    const int algo = CBlockHeader::GetAlgoType(block.nVersion);
     if (block.IsProofOfWork() && !CheckProofOfWork(block.GetPoWHash(), block.nBits, algo, consensusParams))
         return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
 
@@ -1938,7 +1938,7 @@ VersionBitsCache versionbitscache GUARDED_BY(cs_main);
 int32_t ComputeBlockVersion(const CBlockIndex* pindexPrev, int algo, const Consensus::Params& params)
 {
     LOCK(cs_main);
-    int32_t nVersion = CBlockHeader::GetVer(algo); //VERSIONBITS_TOP_BITS;
+    int32_t nVersion = CBlockHeader::GetAlgoFlag(algo); // VERSIONBITS_TOP_BITS;
 
     for (int i = 0; i < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; i++) {
         ThresholdState state = VersionBitsState(pindexPrev, params, static_cast<Consensus::DeploymentPos>(i), versionbitscache);
@@ -1971,7 +1971,7 @@ public:
         return pindex->nHeight >= params.MinBIP9WarningHeight &&
                ((pindex->nVersion & VERSIONBITS_TOP_MASK) == VERSIONBITS_TOP_BITS) &&
                ((pindex->nVersion >> bit) & 1) != 0 &&
-               ((ComputeBlockVersion(pindex->pprev, CBlockHeader::GetAlgo(pindex->nVersion), params) >> bit) & 1) == 0;
+               ((ComputeBlockVersion(pindex->pprev, CBlockHeader::GetAlgoType(pindex->nVersion), params) >> bit) & 1) == 0;
     }
 };
 
@@ -2740,14 +2740,14 @@ static void UpdateTip(CTxMemPool& mempool, const CBlockIndex* pindexNew, const C
         // Check the version of the last 100 blocks to see if we need to upgrade:
         for (int i = 0; i < 100 && pindex != nullptr; i++)
         {
-            int32_t nExpectedVersion = ComputeBlockVersion(pindex->pprev, CBlockHeader::GetAlgo(pindex->nVersion), chainParams.GetConsensus());
+            int32_t nExpectedVersion = ComputeBlockVersion(pindex->pprev, CBlockHeader::GetAlgoType(pindex->nVersion), chainParams.GetConsensus());
             if (pindex->nVersion > VERSIONBITS_LAST_OLD_BLOCK_VERSION && (pindex->nVersion & ~nExpectedVersion) != 0)
                 ++num_unexpected_version;
             pindex = pindex->pprev;
         }
     }
     LogPrintf("%s: new best=%s height=%d version=0x%08x type=%i log2_work=%f tx=%lu date='%s' progress=%f cache=%.1fMiB(%utxo)%s\n", __func__,
-      pindexNew->GetBlockHash().ToString(), pindexNew->nHeight, pindexNew->nVersion, CBlockHeader::GetAlgo(pindexNew->nVersion) == -1 ? pindexNew->IsProofOfWork() : CBlockHeader::GetAlgo(pindexNew->nVersion),
+      pindexNew->GetBlockHash().ToString(), pindexNew->nHeight, pindexNew->nVersion, CBlockHeader::GetAlgoType(pindexNew->nVersion) == -1 ? pindexNew->IsProofOfWork() : CBlockHeader::GetAlgoType(pindexNew->nVersion),
       log(pindexNew->nChainWork.getdouble())/log(2.0), (unsigned long)pindexNew->nChainTx,
       FormatISO8601DateTime(pindexNew->GetBlockTime()),
       GuessVerificationProgress(chainParams.TxData(), pindexNew), ::ChainstateActive().CoinsTip().DynamicMemoryUsage() * (1.0 / (1<<20)), ::ChainstateActive().CoinsTip().GetCacheSize(),
@@ -3608,7 +3608,7 @@ static bool FindUndoPos(BlockValidationState &state, int nFile, FlatFilePos &pos
 
 static bool CheckBlockHeader(const CBlockHeader& block, BlockValidationState& state, const Consensus::Params& consensusParams, bool fCheckPOW = true)
 {
-    const int algo = CBlockHeader::GetAlgo(block.nVersion);
+    const int algo = CBlockHeader::GetAlgoType(block.nVersion);
     if ((block.nVersion >= CBlockHeader::FIRST_FORK_VERSION && algo == -1) || (block.IsProofOfStake() && block.nNonce != 0))
         return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "invalid-type", "block type is invalid");
 
@@ -3623,7 +3623,7 @@ bool CheckBlock(const CBlock& block, BlockValidationState& state, const Consensu
 {
     // These are checks that are independent of context.
     const bool IsPoS = block.IsProofOfStake();
-    LogPrint(BCLog::VALIDATION, "%s: block=%s is %s with type=%i\n", __func__, block.GetHash().ToString(), IsPoS ? "proof of stake" : "proof of work", CBlockHeader::GetAlgo(block.nVersion) == -1 ? !IsPoS : CBlockHeader::GetAlgo(block.nVersion));
+    LogPrint(BCLog::VALIDATION, "%s: block=%s is %s with type=%i\n", __func__, block.GetHash().ToString(), IsPoS ? "proof of stake" : "proof of work", CBlockHeader::GetAlgoType(block.nVersion) == -1 ? !IsPoS : CBlockHeader::GetAlgoType(block.nVersion));
 
     if (block.fChecked)
         return true;
@@ -3815,7 +3815,7 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
         return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "bad-diffbits", "incorrect difficulty target");
 
     // Reject new PoW algorithms until they have been activated
-    if (nHeight < 1 && CBlockHeader::GetAlgo(block.nVersion) > CBlockHeader::ALGO_POW_SHA256)
+    if (nHeight < 1 && CBlockHeader::GetAlgoType(block.nVersion) > CBlockHeader::AlgoType::ALGO_POW_SHA256)
         return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "new-algo", "block using new algo before activation");
 
     // Check against checkpoints

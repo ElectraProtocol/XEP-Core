@@ -20,6 +20,7 @@
 
 typedef uint256 ChainCode;
 
+/* ----------- XEP Hash ------------------------------------------------- */
 /** A hasher class for XEP's 256-bit hash (double SHA-256). */
 class CHash256 {
 private:
@@ -87,7 +88,7 @@ inline uint256 Hash(const T1& in1, const T2& in2) {
     return result;
 }
 
-/** Compute the 160-bit hash an object. */
+/** Compute the 160-bit hash of an object. */
 template<typename T1>
 inline uint160 Hash160(const T1& in1)
 {

@@ -188,7 +188,7 @@ UniValue blockToJSON(const CBlock& block, const CBlockIndex* tip, const CBlockIn
     if (pnext)
         result.pushKV("nextblockhash", pnext->GetBlockHash().GetHex());
 
-    result.pushKV("type", CBlockHeader::GetAlgo(blockindex->nVersion) == -1 ? blockindex->IsProofOfWork() : CBlockHeader::GetAlgo(blockindex->nVersion));
+    result.pushKV("type", CBlockHeader::GetAlgoType(blockindex->nVersion) == -1 ? blockindex->IsProofOfWork() : CBlockHeader::GetAlgoType(blockindex->nVersion));
     result.pushKV("modifier", strprintf("%016x", blockindex->nStakeModifier));
     result.pushKV("modifierV2", blockindex->nStakeModifierV2.GetHex());
     result.pushKV("mint", ValueFromAmount(blockindex->nMint));

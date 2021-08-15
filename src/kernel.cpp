@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2020 The Peercoin developers
 // Copyright (c) 2015-2019 The PIVX developers
-// Copyright (c) 2018-2020 John "ComputerCraftr" Studnicka
+// Copyright (c) 2018-2021 John "ComputerCraftr" Studnicka
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -507,7 +507,7 @@ bool CheckStakeKernelHash(const unsigned int& nBits, const CBlockIndex* pindexPr
     bnTargetPerCoinDay.SetCompact(nBits, &fNegative, &fOverflow);
 
     // Check range
-    if (fNegative || bnTargetPerCoinDay == 0 || fOverflow || bnTargetPerCoinDay > UintToArith256(params.powLimit[CBlockHeader::ALGO_POS]))
+    if (fNegative || bnTargetPerCoinDay == 0 || fOverflow || bnTargetPerCoinDay > UintToArith256(params.powLimit[CBlockHeader::AlgoType::ALGO_POS]))
         return false;
 
     // v0.3 protocol kernel hash weight starts from 0 at the min age

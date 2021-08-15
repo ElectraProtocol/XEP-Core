@@ -282,7 +282,7 @@ bool CBlockTreeDB::LoadBlockIndexGuts(const Consensus::Params& consensusParams, 
                 //pindexNew->nStakeTime     = diskindex.nStakeTime;
                 //pindexNew->hashProofOfStake = diskindex.hashProofOfStake;
 
-                const int algo = CBlockHeader::GetAlgo(pindexNew->nVersion);
+                const int algo = CBlockHeader::GetAlgoType(pindexNew->nVersion);
                 if (pindexNew->IsProofOfWork() && !CheckProofOfWork(pindexNew->GetBlockHeader().GetPoWHash(), pindexNew->nBits, algo, consensusParams))
                     return error("%s: CheckProofOfWork failed: %s", __func__, pindexNew->ToString());
 
