@@ -215,12 +215,14 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
         CMutableTransaction coinstakeTx;
         int64_t nSearchTime = GetAdjustedTime(); // search to current time
         if (nSearchTime > nLastCoinStakeSearchTime) {
+#ifdef ENABLE_WALLET
             if (CreateCoinStake(coinstakeTx, pblock, pwallet, nFees, nHeight, pindexPrev, consensusParams)) {
                 coinbaseTx.vout[0].SetEmpty();
                 pblocktemplate->entries[1].tx = MakeTransactionRef(std::move(coinstakeTx));
                 pblock->vtx[1] = pblocktemplate->entries[1].tx;
                 *pfPoSCancel = false;
             }
+#endif // ENABLE_WALLET
             nLastCoinStakeSearchInterval = nSearchTime - nLastCoinStakeSearchTime;
             nLastCoinStakeSearchTime = nSearchTime;
         }
@@ -535,7 +537,7 @@ void IncrementExtraNonce(CBlock* pblock, const CBlockIndex* pindexPrev, unsigned
     pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
 }
 
-
+#ifdef ENABLE_WALLET
 bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shared_ptr<CWallet> pwallet, const CAmount& nFees, const int& nHeight, const CBlockIndex* pindexPrev, const Consensus::Params& consensusParams)
 {
     AssertLockHeld(pwallet->cs_wallet);
@@ -932,3 +934,4 @@ void MintStake(boost::thread_group& threadGroup, std::shared_ptr<CWallet> pwalle
     // peercoin: mint proof-of-stake blocks in the background
     threadGroup.create_thread(boost::bind(&ThreadStakeMinter, pwallet, walletNum, chainman, connman, mempool));
 }
+#endif // ENABLE_WALLET

@@ -2033,11 +2033,13 @@ bool AppInitMain(const util::Ref& context, NodeContext& node, interfaces::BlockA
         banman->DumpBanlist();
     }, DUMP_BANS_INTERVAL);
 
+#ifdef ENABLE_WALLET
     std::vector<std::shared_ptr<CWallet>> wallets = GetWallets();
     for (unsigned int i = 0; i < wallets.size(); i++) {
         if (wallets[i])
             MintStake(threadGroup, wallets[i], i+1, node.chainman, node.connman.get(), node.mempool.get());
     }
+#endif // ENABLE_WALLET
 
 #if HAVE_SYSTEM
     StartupNotify(args);
