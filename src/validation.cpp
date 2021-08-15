@@ -3804,7 +3804,10 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
     // If this is a reorg and we have been synced for at least an hour, check that it is not too deep
     const int nMaxReorgDepth = gArgs.GetArg("-maxreorgdepth", DEFAULT_MAX_REORG_DEPTH);
     static int64_t nReorgCheckTime = GetTime() + 60 * 60;
-    if (nMaxReorgDepth >= 0 && GetTime() >= nReorgCheckTime && chainHeight - nHeight >= nMaxReorgDepth)
+    static bool fCheckReorgDepth = false;
+    if (!fCheckReorgDepth && GetTime() >= nReorgCheckTime)
+        fCheckReorgDepth = true;
+    if (nMaxReorgDepth >= 0 && fCheckReorgDepth && chainHeight - nHeight >= nMaxReorgDepth)
         return state.Invalid(BlockValidationResult::BLOCK_CHECKPOINT, "bad-fork-prior-to-max-reorg-depth", strprintf("%s: forked chain older than max reorganization depth (height %d, depth %d)", __func__, nHeight, chainHeight - nHeight));
 
     // Check proof of work
