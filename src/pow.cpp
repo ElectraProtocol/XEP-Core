@@ -241,12 +241,12 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
     arith_uint256 refBlockTarget;
 
     // We don't want to recalculate the average of several days' worth of block targets here every single time, so instead we cache the average and start height
-    const bool fUseCache = true;
+    constexpr bool fUseCache = true;
     {
         LOCK(cs_target_cache);
 
         static arith_uint256 refBlockTargetCache;
-        static int nTargetCacheHeight = -1;
+        static int nTargetCacheHeight = -2;
         static int nTargetCacheAlgo = CBlockHeader::ALGO_COUNT;
 
         if (nASERTBlockTargetsToAverage > 0 && nHeight >= nASERTStartHeight + nASERTBlockTargetsToAverage && nHeightDiff >= nASERTBlockTargetsToAverage) {
