@@ -262,19 +262,19 @@ uint32_t arith_uint256::GetCompactRounded(bool fNegative) const
     if (nSize <= 3) {
         nCompact = GetLow64() << 8 * (3 - nSize);
     } else {
-        arith_uint256 bn = *this >> (8 * (nSize - 3) - 4); // Include 4 additional bits for rounding (the 28 most significant bits)
+        arith_uint256 bn = *this >> (8 * (nSize - 3) - 1); // Include an additional bit for rounding (the 25 most significant bits)
         nCompact = bn.GetLow64();
-        const bool fRoundUp = nCompact & 0x8; // Check the 4 least significant bits to see if it is >= 0x8
-        nCompact >>= 4;
+        const bool fRoundUp = nCompact & 1; // Check the least significant bit to see if it is set
+        nCompact >>= 1;
         if (fRoundUp && nCompact < 0x00ffffff)
             nCompact++;
     }
     // The 0x00800000 bit denotes the sign.
     // Thus, if it is already set, divide the mantissa by 256 and increase the exponent.
     if (nCompact & 0x00800000) {
-        nCompact >>= 4;
-        const bool fRoundUp = nCompact & 0x8; // Check the 4 least significant bits to see if it is >= 0x8
-        nCompact >>= 4;
+        nCompact >>= 7;
+        const bool fRoundUp = nCompact & 1; // Check the least significant bit to see if it is set
+        nCompact >>= 1;
         if (fRoundUp && nCompact < 0x0000ffff)
             nCompact++;
         nSize++;
