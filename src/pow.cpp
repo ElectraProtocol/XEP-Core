@@ -190,6 +190,26 @@ unsigned int WeightedTargetExponentialMovingAverage(const CBlockIndex* pindexLas
     return bnNew.GetCompactRounded();
 }
 
+void FastBase2Exp(uint32_t exponent, arith_uint512& result)
+{
+    assert(result == 1 && exponent <= 0b11111); // The exponent must have at most 5 bits to prevent overflowing baseMultiplier as a uint32_t would not be able to hold 2^2^5
+    if (!exponent) {
+        return;
+    }
+    uint32_t baseMultiplier = 2;
+
+    while (true) {
+        if (exponent & 1) {
+            result *= baseMultiplier;
+        }
+        exponent >>= 1;
+        if (!exponent) {
+            return;
+        }
+        baseMultiplier *= baseMultiplier;
+    }
+}
+
 unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
 {
     const int algo = CBlockHeader::GetAlgoType(pblock->nVersion);
@@ -310,8 +330,8 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
     const int exponent = dividend / divisor; // Note: this integer division rounds down positive and rounds up negative numbers via truncation, but the truncated fractional part is handled by the approximation below
     const uint32_t remainder = (fPositive ? dividend : -dividend) % divisor; // Must be positive
     // We are using uint512 rather than uint64_t here because a nPowTargetTimespan of more than 3 days in the divisor may cause the following cubic approximation to overflow a uint64_t
-    arith_uint512 numerator = 1;
-    arith_uint512 denominator = 1;
+    arith_uint512 numerator(1);
+    arith_uint512 denominator(1);
     // Alternatively, ensure that the nPowTargetTimespan (divisor) is small enough such that (2*2*2) * (4 + 11 + 35 + 50) * (divisor)^3 < (2^64 - 1) which is the uint64_t maximum value to leave some room and make overflow extremely unlikely
     //assert(divisor <= (3 * 24 * 60 * 60));
     // Keep in mind that a large exponent due to being extremely far ahead or behind schedule, especially in case of reviving an abandoned chain, will also lead to overflowing the numerator, so a less accurate approximation should be used in this case
@@ -320,8 +340,13 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
 
     //LogPrintf("nHeight = %u, algo = %i is %s schedule, nTimeDiff = %li, ideal = %u, exponent = %i\n", nHeight, algo, fPositive ? "behind" : "ahead of", nTimeDiff, nTargetSpacing * nHeightDiff, exponent);
     if (fPositive) {
-        for (int i = 0; i < exponent; i++)
-            numerator *= 2;
+        if (exponent < 32) {
+            FastBase2Exp(exponent, numerator);
+        } else {
+            for (int i = 0; i < exponent; i++) {
+                numerator *= 2;
+            }
+        }
 
         if (remainder != 0) { // Approximate 2^x with (4x^3+11x^2+35x+50)/50 for 0<x<1 (must be equal to 1 at x=0 and equal to 2 at x=1 to avoid discontinuities) - note: x+1 and (3x^2+7x+10)/10 are also decent and less complicated approximations
             //numerator *= remainder + divisor; // x+1
@@ -335,8 +360,13 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
             //denominator = denominator * (50lu * divisor*divisor*divisor);
         }
     } else {
-        for (int i = 0; i > exponent; i--)
-            denominator *= 2;
+        if (exponent > -32) {
+            FastBase2Exp(-exponent, denominator);
+        } else {
+            for (int i = 0; i > exponent; i--) {
+                denominator *= 2;
+            }
+        }
 
         if (remainder != 0) { // Approximate 2^x with (4x^3+11x^2+35x+50)/50 for 0<x<1 (must be equal to 1 at x=0 and equal to 2 at x=1 to avoid discontinuities) - note: x+1 and (3x^2+7x+10)/10 are also decent and less complicated approximations
             //numerator *= divisor;
@@ -352,7 +382,8 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
     }
 
     // Keep in mind the order of operations and integer division here - this is why the *= operator cannot be used, as it could cause overflow or integer division to occur
-    arith_uint512 bnNew512 = arith_uint512(bnNew) * arith_uint512(numerator) / arith_uint512(denominator);
+    arith_uint512 bnNew512(arith_uint512(bnNew) * numerator / denominator);
+    //arith_uint512 bnNew512(arith_uint512(bnNew) * arith_uint512(numerator) / arith_uint512(denominator));
     bnNew = bnNew512.trim256();
 
     //LogPrintf("numerator = %s\n", numerator.ToString().c_str());
