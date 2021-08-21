@@ -212,7 +212,7 @@ template unsigned int base_uint<512>::bits() const;
 
 // This implementation directly uses shifts instead of going
 // through an intermediate MPI representation.
-arith_uint256& arith_uint256::SetCompact(uint32_t nCompact, bool* pfNegative, bool* pfOverflow)
+arith_uint256& arith_uint256::SetCompactBase256(uint32_t nCompact, bool* pfNegative, bool* pfOverflow)
 {
     int nSize = nCompact >> 24;
     uint32_t nWord = nCompact & 0x007fffff;
@@ -232,7 +232,7 @@ arith_uint256& arith_uint256::SetCompact(uint32_t nCompact, bool* pfNegative, bo
     return *this;
 }
 
-uint32_t arith_uint256::GetCompact(bool fNegative) const
+uint32_t arith_uint256::GetCompactBase256(bool fNegative) const
 {
     int nSize = (bits() + 7) / 8;
     uint32_t nCompact = 0;
@@ -255,7 +255,7 @@ uint32_t arith_uint256::GetCompact(bool fNegative) const
     return nCompact;
 }
 
-uint32_t arith_uint256::GetCompactRounded(bool fNegative) const
+uint32_t arith_uint256::GetCompactRoundedBase256(bool fNegative) const
 {
     int nSize = (bits() + 7) / 8;
     uint32_t nCompact = 0;

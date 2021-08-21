@@ -37,7 +37,7 @@ static CBlock CreateGenesisBlock(const char* pszTimestamp, const std::vector<CSc
     genesis.hashPrevBlock.SetNull();
     genesis.hashMerkleRoot = BlockMerkleRoot(genesis);
 
-    arith_uint256 hashTarget = arith_uint256().SetCompact(std::min(genesis.nBits, (unsigned)0x1f00ffff));
+    arith_uint256 hashTarget = arith_uint256().SetCompactBase256(std::min(genesis.nBits, (unsigned)0x1f00ffff));
     /*while (true) {
         arith_uint256 hash = UintToArith256(genesis.GetPoWHash());
         if (hash <= hashTarget) {
@@ -153,7 +153,7 @@ public:
         genesisRewards.emplace_back(500000000 * COIN); // 0.5 billion
         genesisRewards.emplace_back(500000000 * COIN); // 0.5 billion
         genesisRewards.emplace_back(500000000 * COIN); // 0.5 billion
-        genesis = CreateGenesisBlock(1609246800, 10543997, UintToArith256(consensus.powLimit[CBlockHeader::AlgoType::ALGO_POW_SHA256]).GetCompact(), 1, genesisRewards);
+        genesis = CreateGenesisBlock(1609246800, 10543997, UintToArith256(consensus.powLimit[CBlockHeader::AlgoType::ALGO_POW_SHA256]).GetCompactBase256(), 1, genesisRewards);
         consensus.hashGenesisBlock = genesis.GetHash();
         //printf("Merkle hash mainnet: %s\n", genesis.hashMerkleRoot.ToString().c_str());
         //printf("Genesis hash mainnet: %s\n", consensus.hashGenesisBlock.ToString().c_str());
@@ -276,7 +276,7 @@ public:
         genesisRewards.emplace_back(500000000 * COIN); // 0.5 billion
         genesisRewards.emplace_back(500000000 * COIN); // 0.5 billion
         genesisRewards.emplace_back(500000000 * COIN); // 0.5 billion
-        genesis = CreateGenesisBlock(1609246800, 10543997, UintToArith256(consensus.powLimit[CBlockHeader::AlgoType::ALGO_POW_SHA256]).GetCompact(), 1, genesisRewards);
+        genesis = CreateGenesisBlock(1609246800, 10543997, UintToArith256(consensus.powLimit[CBlockHeader::AlgoType::ALGO_POW_SHA256]).GetCompactBase256(), 1, genesisRewards);
         consensus.hashGenesisBlock = genesis.GetHash();
         //printf("Merkle hash testnet: %s\n", genesis.hashMerkleRoot.ToString().c_str());
         //printf("Genesis hash testnet: %s\n", consensus.hashGenesisBlock.ToString().c_str());
@@ -439,7 +439,7 @@ public:
         genesisRewards.emplace_back(500000000 * COIN); // 0.5 billion
         genesisRewards.emplace_back(500000000 * COIN); // 0.5 billion
         genesisRewards.emplace_back(500000000 * COIN); // 0.5 billion
-        genesis = CreateGenesisBlock(1609246800, 2078674, UintToArith256(consensus.powLimit[CBlockHeader::AlgoType::ALGO_POW_SHA256]).GetCompact(), 1, genesisRewards);
+        genesis = CreateGenesisBlock(1609246800, 2078674, UintToArith256(consensus.powLimit[CBlockHeader::AlgoType::ALGO_POW_SHA256]).GetCompactBase256(), 1, genesisRewards);
         consensus.hashGenesisBlock = genesis.GetHash();
         //printf("Merkle hash signet: %s\n", genesis.hashMerkleRoot.ToString().c_str());
         //printf("Genesis hash signet: %s\n", consensus.hashGenesisBlock.ToString().c_str());
@@ -534,7 +534,7 @@ public:
         genesisRewards.emplace_back(500000000 * COIN); // 0.5 billion
         genesisRewards.emplace_back(500000000 * COIN); // 0.5 billion
         genesisRewards.emplace_back(500000000 * COIN); // 0.5 billion
-        genesis = CreateGenesisBlock(1609246800, 14201, UintToArith256(consensus.powLimit[CBlockHeader::AlgoType::ALGO_POW_SHA256]).GetCompact(), 1, genesisRewards);
+        genesis = CreateGenesisBlock(1609246800, 14201, UintToArith256(consensus.powLimit[CBlockHeader::AlgoType::ALGO_POW_SHA256]).GetCompactBase256(), 1, genesisRewards);
         consensus.hashGenesisBlock = genesis.GetHash();
         //printf("Merkle hash regtest: %s\n", genesis.hashMerkleRoot.ToString().c_str());
         //printf("Genesis hash regtest: %s\n", consensus.hashGenesisBlock.ToString().c_str());

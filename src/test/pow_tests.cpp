@@ -64,7 +64,7 @@ BOOST_AUTO_TEST_CASE(CheckProofOfWork_test_negative_target)
     const auto consensus = CreateChainParams(*m_node.args, CBaseChainParams::MAIN)->GetConsensus();
     uint256 hash;
     unsigned int nBits;
-    nBits = UintToArith256(consensus.powLimit[CBlockHeader::AlgoType::ALGO_POW_SHA256]).GetCompact(true);
+    nBits = UintToArith256(consensus.powLimit[CBlockHeader::AlgoType::ALGO_POW_SHA256]).GetCompactBase256(true);
     hash.SetHex("0x1");
     BOOST_CHECK(!CheckProofOfWork(hash, nBits, CBlockHeader::AlgoType::ALGO_POW_SHA256, consensus));
 }
@@ -85,7 +85,7 @@ BOOST_AUTO_TEST_CASE(CheckProofOfWork_test_too_easy_target)
     unsigned int nBits;
     arith_uint256 nBits_arith = UintToArith256(consensus.powLimit[CBlockHeader::AlgoType::ALGO_POW_SHA256]);
     nBits_arith *= 2;
-    nBits = nBits_arith.GetCompact();
+    nBits = nBits_arith.GetCompactBase256();
     hash.SetHex("0x1");
     BOOST_CHECK(!CheckProofOfWork(hash, nBits, CBlockHeader::AlgoType::ALGO_POW_SHA256, consensus));
 }
@@ -96,7 +96,7 @@ BOOST_AUTO_TEST_CASE(CheckProofOfWork_test_biger_hash_than_target)
     uint256 hash;
     unsigned int nBits;
     arith_uint256 hash_arith = UintToArith256(consensus.powLimit[CBlockHeader::AlgoType::ALGO_POW_SHA256]);
-    nBits = hash_arith.GetCompact();
+    nBits = hash_arith.GetCompactBase256();
     hash_arith *= 2; // hash > nBits
     hash = ArithToUint256(hash_arith);
     BOOST_CHECK(!CheckProofOfWork(hash, nBits, CBlockHeader::AlgoType::ALGO_POW_SHA256, consensus));
@@ -108,7 +108,7 @@ BOOST_AUTO_TEST_CASE(CheckProofOfWork_test_zero_target)
     uint256 hash;
     unsigned int nBits;
     arith_uint256 hash_arith{0};
-    nBits = hash_arith.GetCompact();
+    nBits = hash_arith.GetCompactBase256();
     hash = ArithToUint256(hash_arith);
     BOOST_CHECK(!CheckProofOfWork(hash, nBits, CBlockHeader::AlgoType::ALGO_POW_SHA256, consensus));
 }
@@ -149,7 +149,7 @@ void sanity_check_chainparams(const ArgsManager& args, std::string chainName)
     // genesis nBits is positive, doesn't overflow and is lower than powLimit
     arith_uint256 pow_compact;
     bool neg, over;
-    pow_compact.SetCompact(chainParams->GenesisBlock().nBits, &neg, &over);
+    pow_compact.SetCompactBase256(chainParams->GenesisBlock().nBits, &neg, &over);
     BOOST_CHECK(!neg && pow_compact != 0);
     BOOST_CHECK(!over);
     BOOST_CHECK(UintToArith256(consensus.powLimit[CBlockHeader::AlgoType::ALGO_POW_SHA256]) >= pow_compact);

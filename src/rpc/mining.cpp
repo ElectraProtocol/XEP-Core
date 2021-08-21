@@ -131,7 +131,7 @@ static bool GenerateBlock(ChainstateManager& chainman, CBlock& block, uint64_t& 
         return true;
     }
     if (chainparams.NetworkIDString() != CBaseChainParams::REGTEST)
-        LogPrintf("proof-of-work found\n   hash: %s\n target: %s\n   bits: %08x\n  nonce: %u\n", block.GetPoWHash().ToString(), arith_uint256().SetCompact(block.nBits).ToString(), block.nBits, block.nNonce);
+        LogPrintf("proof-of-work found\n   hash: %s\n target: %s\n   bits: %08x\n  nonce: %u\n", block.GetPoWHash().ToString(), arith_uint256().SetCompactBase256(block.nBits).ToString(), block.nBits, block.nNonce);
 
     std::shared_ptr<const CBlock> shared_pblock = std::make_shared<const CBlock>(block);
     if (!chainman.ProcessNewBlock(chainparams, shared_pblock, true, nullptr)) {
@@ -807,7 +807,7 @@ static RPCHelpMan getblocktemplate()
 
     UniValue aux(UniValue::VOBJ);
 
-    arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
+    arith_uint256 hashTarget = arith_uint256().SetCompactBase256(pblock->nBits);
 
     UniValue aMutable(UniValue::VARR);
     aMutable.push_back("time");
