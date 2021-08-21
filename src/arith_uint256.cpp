@@ -286,6 +286,60 @@ uint32_t arith_uint256::GetCompactRoundedBase256(bool fNegative) const
     return nCompact;
 }
 
+arith_uint256& arith_uint256::SetCompactBase4(uint32_t nCompact, bool* pfOverflow)
+{
+    int nSize = nCompact >> 24;
+    uint32_t nWord = nCompact & 0x00ffffff;
+    if (nSize <= 12) {
+        nWord >>= 2 * (12 - nSize);
+        *this = nWord;
+    } else {
+        *this = nWord;
+        *this <<= 2 * (nSize - 12);
+    }
+    if (pfOverflow)
+        *pfOverflow = nWord != 0 && ((nSize > 136) ||
+                                     (nWord > 0xff && nSize > 132) ||
+                                     (nWord > 0xffff && nSize > 128));
+    return *this;
+}
+
+uint32_t arith_uint256::GetCompactBase4() const
+{
+    int nSize = (bits() + 1) / 2;
+    uint32_t nCompact = 0;
+    if (nSize <= 12) {
+        nCompact = GetLow64() << 2 * (12 - nSize);
+    } else {
+        arith_uint256 bn = *this >> 2 * (nSize - 12);
+        nCompact = bn.GetLow64();
+    }
+    assert((nCompact & ~0x00ffffff) == 0);
+    assert(nSize < 256);
+    nCompact |= nSize << 24;
+    return nCompact;
+}
+
+uint32_t arith_uint256::GetCompactRoundedBase4() const
+{
+    int nSize = (bits() + 1) / 2;
+    uint32_t nCompact = 0;
+    if (nSize <= 12) {
+        nCompact = GetLow64() << 2 * (12 - nSize);
+    } else {
+        arith_uint256 bn = *this >> (2 * (nSize - 12) - 1); // Include an additional bit for rounding (the 25 most significant bits)
+        nCompact = bn.GetLow64();
+        const bool fRoundUp = nCompact & 1; // Check the least significant bit to see if it is set
+        nCompact >>= 1;
+        if (fRoundUp && nCompact < 0x00ffffff)
+            nCompact++;
+    }
+    assert((nCompact & ~0x00ffffff) == 0);
+    assert(nSize < 256);
+    nCompact |= nSize << 24;
+    return nCompact;
+}
+
 uint256 ArithToUint256(const arith_uint256 &a)
 {
     uint256 b;
