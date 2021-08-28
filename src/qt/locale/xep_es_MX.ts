@@ -288,6 +288,10 @@ Signing is only possible with addresses of the type 'legacy'.</translation>
         <translation>Salir de la aplicación</translation>
     </message>
     <message>
+        <source>&amp;About %1</source>
+        <translation>%Acerca de%1</translation>
+    </message>
+    <message>
         <source>Show information about %1</source>
         <translation>Mostrar información acerca de %1</translation>
     </message>
