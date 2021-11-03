@@ -1463,10 +1463,10 @@ void PrecomputedTransactionData::Init(const T& txTo, std::vector<CTxOut>&& spent
     }
 
     // Determine which precomputation-impacting features this transaction uses.
-    bool uses_bip143_segwit = false;
+    bool uses_bip143_segwit = static_cast<uint32_t>(txTo.nVersion) >= 2;
     bool uses_bip341_taproot = false;
     for (size_t inpos = 0; inpos < txTo.vin.size(); ++inpos) {
-        if (static_cast<uint32_t>(txTo.nVersion) >= 2 || !txTo.vin[inpos].scriptWitness.IsNull()) {
+        if (!txTo.vin[inpos].scriptWitness.IsNull()) {
             if (m_spent_outputs_ready && m_spent_outputs[inpos].scriptPubKey.size() == 2 + WITNESS_V1_TAPROOT_SIZE &&
                 m_spent_outputs[inpos].scriptPubKey[0] == OP_1) {
                 // Treat every witness-bearing spend with 34-byte scriptPubKey that starts with OP_1 as a Taproot
