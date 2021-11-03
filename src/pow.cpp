@@ -190,26 +190,6 @@ unsigned int WeightedTargetExponentialMovingAverage(const CBlockIndex* pindexLas
     return bnNew.GetCompactRoundedBase256();
 }
 
-void FastBase2Exp(uint32_t exponent, arith_uint512& result)
-{
-    assert(result == 1 && exponent <= 0b11111); // The exponent must have at most 5 bits to prevent overflowing baseMultiplier as a uint32_t would not be able to hold 2^2^5
-    if (!exponent) {
-        return;
-    }
-    uint32_t baseMultiplier = 2;
-
-    while (true) {
-        if (exponent & 1) {
-            result *= baseMultiplier;
-        }
-        exponent >>= 1;
-        if (!exponent) {
-            return;
-        }
-        baseMultiplier *= baseMultiplier;
-    }
-}
-
 unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
 {
     const int algo = CBlockHeader::GetAlgoType(pblock->nVersion);
@@ -340,12 +320,9 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
 
     //LogPrintf("nHeight = %u, algo = %i is %s schedule, nTimeDiff = %li, ideal = %u, exponent = %i\n", nHeight, algo, fPositive ? "behind" : "ahead of", nTimeDiff, nTargetSpacing * nHeightDiff, exponent);
     if (fPositive) {
-        if (exponent < 32) {
-            FastBase2Exp(exponent, numerator);
-        } else {
-            for (int i = 0; i < exponent; i++) {
-                numerator *= 2;
-            }
+        if (exponent > 0) {
+            // Left shifting the numerator is equivalent to multiplying it by a power of 2
+            numerator <<= exponent;
         }
 
         if (remainder != 0) { // Approximate 2^x with (4x^3+11x^2+35x+50)/50 for 0<x<1 (must be equal to 1 at x=0 and equal to 2 at x=1 to avoid discontinuities) - note: x+1 and (3x^2+7x+10)/10 are also decent and less complicated approximations
@@ -360,12 +337,9 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
             //denominator = denominator * (50lu * divisor*divisor*divisor);
         }
     } else {
-        if (exponent > -32) {
-            FastBase2Exp(-exponent, denominator);
-        } else {
-            for (int i = 0; i > exponent; i--) {
-                denominator *= 2;
-            }
+        if (exponent < 0) {
+            // Left shifting the denominator is equivalent to multiplying it by a power of 2
+            denominator <<= -exponent;
         }
 
         if (remainder != 0) { // Approximate 2^x with (4x^3+11x^2+35x+50)/50 for 0<x<1 (must be equal to 1 at x=0 and equal to 2 at x=1 to avoid discontinuities) - note: x+1 and (3x^2+7x+10)/10 are also decent and less complicated approximations
