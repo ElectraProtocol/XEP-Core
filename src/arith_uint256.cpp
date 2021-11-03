@@ -272,9 +272,8 @@ uint32_t arith_uint256::GetCompactRoundedBase256(bool fNegative) const
     // The 0x00800000 bit denotes the sign.
     // Thus, if it is already set, divide the mantissa by 256 and increase the exponent.
     if (nCompact & 0x00800000) {
-        nCompact >>= 7;
-        const bool fRoundUp = nCompact & 1; // Check the least significant bit to see if it is set
-        nCompact >>= 1;
+        const bool fRoundUp = nCompact & 0x80; // Check the 8 least significant bits to see if it is >= 0x80
+        nCompact >>= 8;
         if (fRoundUp && nCompact < 0x0000ffff)
             nCompact++;
         nSize++;
