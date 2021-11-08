@@ -131,6 +131,7 @@ void StartWallets(CScheduler& scheduler, const ArgsManager& args)
         scheduler.scheduleEvery(MaybeCompactWalletDB, std::chrono::milliseconds{500});
     }
     scheduler.scheduleEvery(MaybeResendWalletTxs, std::chrono::milliseconds{1000});
+    scheduler.scheduleEvery(AbandonOrphanedCoinStakes, std::chrono::seconds{600});
 }
 
 void FlushWallets()

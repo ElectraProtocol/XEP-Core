@@ -2154,6 +2154,24 @@ void MaybeResendWalletTxs()
     }
 }
 
+void AbandonOrphanedCoinStakes()
+{
+    for (const std::shared_ptr<CWallet>& pwallet : GetWallets()) {
+        TRY_LOCK(pwallet->cs_wallet, locked_wallet);
+
+        if (locked_wallet) {
+            for (const std::pair<const uint256, CWalletTx>& item : pwallet->mapWallet) {
+                const CWalletTx& wtx = item.second;
+                if (wtx.isUnconfirmed() && (wtx.IsCoinBase() || wtx.IsCoinStake())) {
+                    const uint256& wtxid = item.first;
+                    pwallet->WalletLogPrintf("Abandoning orphaned coinbase/coinstake %s\n", wtxid.ToString());
+                    pwallet->AbandonTransaction(wtxid);
+                }
+            }
+        }
+    }
+}
+
 
 /** @defgroup Actions
  *
