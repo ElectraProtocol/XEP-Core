@@ -20,22 +20,43 @@ Mutex cs_target_cache;
 // peercoin: find last block index up to pindex
 static inline const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, const bool fProofOfStake)
 {
-    while (pindex && pindex->pprev && pindex->IsProofOfStake() != fProofOfStake)
+    while (pindex && pindex->IsProofOfStake() != fProofOfStake && pindex->pprev)
         pindex = pindex->pprev;
     return pindex;
 }
 
 static inline const CBlockIndex* GetLastBlockIndexForAlgo(const CBlockIndex* pindex, const int& algo)
 {
-    while (pindex && pindex->pprev && CBlockHeader::GetAlgoType(pindex->nVersion) != algo)
+    while (pindex && CBlockHeader::GetAlgoType(pindex->nVersion) != algo && pindex->pprev)
         pindex = pindex->pprev;
     return pindex;
 }
 
+static inline const CBlockIndex* GetASERTReferenceBlockForAlgo(const CBlockIndex* pindex, const int& nASERTStartHeight, const int& algo)
+{
+    if (!pindex)
+        return pindex;
+
+    while (pindex->nHeight >= nASERTStartHeight) {
+        const CBlockIndex* pprev = GetLastBlockIndexForAlgo(pindex->pprev, algo);
+        if (pprev)
+            pindex = pprev;
+        else
+            break;
+    }
+    return pindex;
+}
+
+// Note that calling this function as part of the difficulty calculation for every block results in a time complexity of O(n^2)
+// with respect to the number of blocks in the chain as it must count back to the reference block each time it is called while syncing
 static inline const CBlockIndex* GetASERTReferenceBlockAndHeightForAlgo(const CBlockIndex* pindex, const uint32_t& nProofOfWorkLimit, const int& nASERTStartHeight, const int& algo, uint32_t& nBlocksPassed)
 {
     nBlocksPassed = 1; // Account for the ASERT reference block here
-    while (pindex && pindex->pprev && pindex->nHeight >= nASERTStartHeight) {
+
+    if (!pindex)
+        return pindex;
+
+    while (pindex->nHeight >= nASERTStartHeight) {
         const CBlockIndex* pprev = GetLastBlockIndexForAlgo(pindex->pprev, algo);
         if (pprev)
             pindex = pprev;
@@ -223,15 +244,31 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
         return WeightedTargetExponentialMovingAverage(pindexLast, pblock, params);
 
     uint32_t nBlocksPassed = 0;
-    const CBlockIndex* pindexReferenceBlock = GetASERTReferenceBlockAndHeightForAlgo(pindexPrev, nProofOfWorkLimit, nASERTStartHeight, algo, nBlocksPassed);
-    const CBlockIndex* pindexReferenceBlockPrev = algo == -1 ? GetLastBlockIndex(pindexReferenceBlock->pprev, fProofOfStake) : GetLastBlockIndexForAlgo(pindexReferenceBlock->pprev, algo);
-    // Use reference block's parent block's timestamp unless it is the genesis (not using the prev timestamp here would put us permanently one block behind schedule)
-    int64_t refBlockTimestamp = pindexReferenceBlockPrev ? pindexReferenceBlockPrev->GetBlockTime() : (pindexReferenceBlock->GetBlockTime() - nTargetSpacing);
+    int64_t refBlockTimestamp;
+    uint32_t refBlockBits;
+    if (nHeight > static_cast<uint32_t>(params.nLastPoWBlock)) { // If we are past the last PoW block, we can get the number of PoS blocks in the chain by simply using the block height instead of performing the expensive looping below
+        // The last PoW block is at height 148953 with 3079 PoW blocks in the chain at this point, but we need to subtract one because we cannot count the current block as having "passed" yet
+        nBlocksPassed = nHeight - 3078; // TODO: replace with a cache of actual PoW/PoS block counts
+        // Using a static variable concurrently in this context is safe and will not cause a race condition during initialization because C++11 guarantees that static variables will be initialized exactly once
+        static const CBlockIndex* const pindexReferenceBlock = GetASERTReferenceBlockForAlgo(pindexPrev, nASERTStartHeight, algo);
+        const CBlockIndex* const pindexReferenceBlockPrev = algo == -1 ? GetLastBlockIndex(pindexReferenceBlock->pprev, fProofOfStake) : GetLastBlockIndexForAlgo(pindexReferenceBlock->pprev, algo);
+        // Use reference block's parent block's timestamp unless it is the genesis (not using the prev timestamp here would put us permanently one block behind schedule)
+        refBlockTimestamp = pindexReferenceBlockPrev ? pindexReferenceBlockPrev->GetBlockTime() : (pindexReferenceBlock->GetBlockTime() - nTargetSpacing);
+        refBlockBits = pindexReferenceBlock->nBits;
+    } else {
+        const CBlockIndex* const pindexReferenceBlock = GetASERTReferenceBlockAndHeightForAlgo(pindexPrev, nProofOfWorkLimit, nASERTStartHeight, algo, nBlocksPassed);
+        const CBlockIndex* const pindexReferenceBlockPrev = algo == -1 ? GetLastBlockIndex(pindexReferenceBlock->pprev, fProofOfStake) : GetLastBlockIndexForAlgo(pindexReferenceBlock->pprev, algo);
+        // Use reference block's parent block's timestamp unless it is the genesis (not using the prev timestamp here would put us permanently one block behind schedule)
+        refBlockTimestamp = pindexReferenceBlockPrev ? pindexReferenceBlockPrev->GetBlockTime() : (pindexReferenceBlock->GetBlockTime() - nTargetSpacing);
+        refBlockBits = pindexReferenceBlock->nBits;
+    }
+
     // The reference timestamp must be divisible by (nStakeTimestampMask+1) or else the PoS block emission will never be exactly on schedule
     if (fProofOfStake) {
         while ((refBlockTimestamp & params.nStakeTimestampMask) != 0)
             refBlockTimestamp++;
     }
+
     const int64_t nTimeDiff = pindexPrev->GetBlockTime() - refBlockTimestamp;
     //LogPrintf("pindexReferenceBlock->GetBlockHash() = %s\n", pindexReferenceBlock->GetBlockHash().ToString().c_str());
     //LogPrintf("nBlocksPassed = %u\n", nBlocksPassed);
@@ -250,7 +287,7 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
         static int nTargetCacheAlgo = CBlockHeader::AlgoType::ALGO_COUNT;
 
         if (nASERTBlockTargetsToAverage > 0 && nHeight >= nASERTStartHeight + nASERTBlockTargetsToAverage && nHeightDiff >= nASERTBlockTargetsToAverage) {
-            if (!fUseCache || nTargetCacheHeight != (int)(nHeightDiff / nASERTBlockTargetsToAverage) || nTargetCacheAlgo != algo || refBlockTargetCache == arith_uint256() || algo == -1) {
+            if (!fUseCache || nTargetCacheHeight != static_cast<int>(nHeightDiff / nASERTBlockTargetsToAverage) || nTargetCacheAlgo != algo || refBlockTargetCache == arith_uint256() || algo == -1) {
                 const uint32_t nBlocksToSkip = nHeightDiff % nASERTBlockTargetsToAverage;
                 const CBlockIndex* pindex = pindexPrev;
                 //LogPrintf("nBlocksToSkip = %u\n", nBlocksToSkip);
@@ -261,7 +298,7 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
                 //LogPrintf("begin pindex->nHeight = %i\n", pindex->nHeight);
 
                 //unsigned int nBlocksAveraged = 0;
-                for (int i = 0; i < (int)nASERTBlockTargetsToAverage; i++) {
+                for (int i = 0; i < static_cast<int>(nASERTBlockTargetsToAverage); i++) {
                     if (pindex->nBits != (nProofOfWorkLimit - 1) || !params.fPowAllowMinDifficultyBlocks) { // Don't add min difficulty targets to the average
                         arith_uint256 bnTarget = arith_uint256().SetCompactBase256(pindex->nBits);
                         refBlockTarget += bnTarget / nASERTBlockTargetsToAverage;
@@ -291,14 +328,14 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
         } else {
             if (fUseCache && algo != -1) {
                 if (nTargetCacheHeight != -1 || nTargetCacheAlgo != algo || refBlockTargetCache == arith_uint256()) {
-                    refBlockTargetCache = arith_uint256().SetCompactBase256(pindexReferenceBlock->nBits);
+                    refBlockTargetCache = arith_uint256().SetCompactBase256(refBlockBits);
                     nTargetCacheHeight = -1;
                     nTargetCacheAlgo = algo;
                     //LogPrintf("Set ref target cache at nHeight = %u with algo = %i\n", nHeight, algo);
                 }
                 refBlockTarget = refBlockTargetCache;
             } else
-                refBlockTarget = arith_uint256().SetCompactBase256(pindexReferenceBlock->nBits);
+                refBlockTarget = arith_uint256().SetCompactBase256(refBlockBits);
         }
     }
 
