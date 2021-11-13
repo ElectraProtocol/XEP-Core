@@ -173,7 +173,7 @@ public:
     explicit BlockAssembler(const CTxMemPool& mempool, const CChainParams& params, const Options& options);
 
     /** Construct a new block template with coinbase to scriptPubKeyIn */
-    std::unique_ptr<CBlockTemplate> CreateNewBlock(const CScript& scriptPubKeyIn, std::shared_ptr<CWallet> pwallet=nullptr, bool* pfPoSCancel=nullptr);
+    std::unique_ptr<CBlockTemplate> CreateNewBlock(const CScript& scriptPubKeyIn, const std::shared_ptr<CWallet>& pwallet=nullptr, bool* pfPoSCancel=nullptr);
 
     static Optional<int64_t> m_last_block_num_txs;
     static Optional<int64_t> m_last_block_weight;
@@ -220,12 +220,10 @@ int64_t UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParam
 void RegenerateCommitments(CBlock& block);
 
 #ifdef ENABLE_WALLET
-namespace boost {
-    class thread_group;
-} // namespace boost
-
-bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shared_ptr<CWallet> pwallet, const CAmount& nFees, const int& nHeight, const CBlockIndex* pindexPrev, const Consensus::Params& consensusParams);
-void MintStake(boost::thread_group& threadGroup, std::shared_ptr<CWallet> pwallet, const unsigned int walletNum, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool);
+bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, const std::shared_ptr<CWallet>& pwallet, const CAmount& nFees, const int& nHeight, const CBlockIndex* pindexPrev, const Consensus::Params& consensusParams);
+void CreateStakingThread(const std::shared_ptr<CWallet>& pwallet, const unsigned int walletNum, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool);
+//void StopStakingThread(const unsigned int threadNum);
+void StopStakingThreads();
 #endif // ENABLE_WALLET
 
 #endif // BITCOIN_MINER_H

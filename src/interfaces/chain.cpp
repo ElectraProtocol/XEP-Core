@@ -8,6 +8,7 @@
 #include <chainparams.h>
 #include <interfaces/handler.h>
 #include <interfaces/wallet.h>
+#include <miner.h>
 #include <net.h>
 #include <net_processing.h>
 #include <node/coin.h>
@@ -408,6 +409,12 @@ public:
             notifications.transactionAddedToMempool(entry.GetSharedTx(), 0 /* mempool_sequence */);
         }
     }
+#ifdef ENABLE_WALLET
+    void stopStakingThreads() override
+    {
+        StopStakingThreads();
+    }
+#endif // ENABLE_WALLET
     NodeContext& m_node;
 };
 } // namespace

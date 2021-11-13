@@ -18,6 +18,7 @@
 #include <policy/policy.h>
 #include <pow.h>
 #include <primitives/transaction.h>
+#include <threadinterrupt.h>
 #include <timedata.h>
 #include <util/moneystr.h>
 #include <util/system.h>
@@ -32,11 +33,15 @@
 #include <warnings.h>
 
 #include <algorithm>
+#include <thread>
 #include <utility>
 
-#include <boost/thread.hpp>
-
+#ifdef ENABLE_WALLET
+static std::vector<std::thread> staking_threads;
+static CThreadInterrupt staking_threads_interrupt;
+#endif // ENABLE_WALLET
 int64_t nLastCoinStakeSearchInterval = 0;
+
 int64_t UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, const CBlockIndex* pindexPrev)
 {
     int64_t nOldTime = pblock->nTime;
@@ -125,7 +130,7 @@ Optional<int64_t> BlockAssembler::m_last_block_num_txs{nullopt};
 Optional<int64_t> BlockAssembler::m_last_block_weight{nullopt};
 
 // peercoin: if pwallet != NULL it will attempt to create coinstake
-std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, std::shared_ptr<CWallet> pwallet, bool* pfPoSCancel)
+std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, const std::shared_ptr<CWallet>& pwallet, bool* pfPoSCancel)
 {
     int64_t nTimeStart = GetTimeMicros();
 
@@ -538,7 +543,7 @@ void IncrementExtraNonce(CBlock* pblock, const CBlockIndex* pindexPrev, unsigned
 }
 
 #ifdef ENABLE_WALLET
-bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shared_ptr<CWallet> pwallet, const CAmount& nFees, const int& nHeight, const CBlockIndex* pindexPrev, const Consensus::Params& consensusParams)
+bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, const std::shared_ptr<CWallet>& pwallet, const CAmount& nFees, const int& nHeight, const CBlockIndex* pindexPrev, const Consensus::Params& consensusParams)
 {
     AssertLockHeld(pwallet->cs_wallet);
 
@@ -770,7 +775,7 @@ static inline bool ProcessBlockFound(const CBlock* pblock, const CChainParams& c
     return true;
 }
 
-static inline void PoSMiner(std::shared_ptr<CWallet> pwallet, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool)
+static inline void PoSMiner(const std::shared_ptr<CWallet>& pwallet, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool)
 {
     LogPrintf("CPUMiner started for proof-of-stake\n");
 
@@ -792,7 +797,6 @@ static inline void PoSMiner(std::shared_ptr<CWallet> pwallet, ChainstateManager*
     const std::string strMintSyncMessage = _("Info: Minting suspended while synchronizing wallet.").translated;
     const std::string strMintDisabledMessage = _("Info: Minting disabled by 'nostaking' option.").translated;
     const std::string strMintBlockMessage = _("Info: Minting suspended due to block creation failure.").translated;
-    const std::string strMintEmpty = "";
 
     if (!gArgs.GetBoolArg("-staking", true)) {
         SetMintWarning(strMintDisabledMessage);
@@ -809,7 +813,7 @@ static inline void PoSMiner(std::shared_ptr<CWallet> pwallet, ChainstateManager*
                     uiInterface.NotifyAlertChanged();
                 }
                 fNeedToClear = true;
-                if (!connman->interruptNet.sleep_for(std::chrono::seconds(3)))
+                if (!staking_threads_interrupt.sleep_for(std::chrono::seconds(3)))
                     return;
             }
 
@@ -822,7 +826,7 @@ static inline void PoSMiner(std::shared_ptr<CWallet> pwallet, ChainstateManager*
                         uiInterface.NotifyAlertChanged();
                     }
                     fNeedToClear = true;
-                    if (!connman->interruptNet.sleep_for(std::chrono::seconds(10)))
+                    if (!staking_threads_interrupt.sleep_for(std::chrono::seconds(10)))
                         return;
                 }
             }
@@ -834,11 +838,11 @@ static inline void PoSMiner(std::shared_ptr<CWallet> pwallet, ChainstateManager*
                     uiInterface.NotifyAlertChanged();
                 }
                 fNeedToClear = true;
-                if (!connman->interruptNet.sleep_for(std::chrono::seconds(10)))
+                if (!staking_threads_interrupt.sleep_for(std::chrono::seconds(10)))
                     return;
             }
             if (fNeedToClear) {
-                SetMintWarning(strMintEmpty);
+                SetMintWarning("");
                 uiInterface.NotifyAlertChanged();
                 fNeedToClear = false;
             }
@@ -859,14 +863,14 @@ static inline void PoSMiner(std::shared_ptr<CWallet> pwallet, ChainstateManager*
 
             if (!pblocktemplate.get()) {
                 if (fPoSCancel == true) {
-                    if (!connman->interruptNet.sleep_for(std::chrono::milliseconds(pos_timio)))
+                    if (!staking_threads_interrupt.sleep_for(std::chrono::milliseconds(pos_timio)))
                         return;
                     continue;
                 }
                 SetMintWarning(strMintBlockMessage);
                 uiInterface.NotifyAlertChanged();
                 LogPrintf("Error in XEPMiner: Keypool ran out, please call keypoolrefill before restarting the staking thread\n");
-                if (!connman->interruptNet.sleep_for(std::chrono::seconds(10)))
+                if (!staking_threads_interrupt.sleep_for(std::chrono::seconds(10)))
                    return;
 
                 return;
@@ -896,25 +900,23 @@ static inline void PoSMiner(std::shared_ptr<CWallet> pwallet, ChainstateManager*
             LogPrintf("CPUMiner : proof-of-stake block found %s\n", pblock->GetHash().ToString());
             ProcessBlockFound(pblock, Params(), chainman);
             // Rest for ~3 minutes after successful block to preserve close quick
-            if (!connman->interruptNet.sleep_for(std::chrono::seconds(60 + GetRand(4))))
+            if (!staking_threads_interrupt.sleep_for(std::chrono::seconds(60 + GetRand(4))))
                 return;
-            if (!connman->interruptNet.sleep_for(std::chrono::milliseconds(pos_timio)))
+            if (!staking_threads_interrupt.sleep_for(std::chrono::milliseconds(pos_timio)))
                 return;
-
-            continue;
         }
-    } catch (boost::thread_interrupted) {
-        LogPrintf("XEPMiner terminated\n");
-        return;
-        // throw;
     } catch (const std::runtime_error &e) {
         LogPrintf("XEPMiner runtime error: %s\n", e.what());
         return;
+    } catch (...) {
+        LogPrintf("XEPMiner terminated\n");
+        return;
+        // throw;
     }
 }
 
 // peercoin: stake minter thread
-static void ThreadStakeMinter(std::shared_ptr<CWallet> pwallet, const unsigned int walletNum, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool)
+static void ThreadStakeMinter(const std::shared_ptr<CWallet>& pwallet, const unsigned int walletNum, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool)
 {
     util::ThreadRename("xep-stake-minter-" + std::to_string(walletNum));
     LogPrintf("ThreadStakeMinter #%u started\n", walletNum);
@@ -929,9 +931,34 @@ static void ThreadStakeMinter(std::shared_ptr<CWallet> pwallet, const unsigned i
 }
 
 // peercoin: stake minter
-void MintStake(boost::thread_group& threadGroup, std::shared_ptr<CWallet> pwallet, const unsigned int walletNum, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool)
+void CreateStakingThread(const std::shared_ptr<CWallet>& pwallet, const unsigned int walletNum, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool)
 {
     // peercoin: mint proof-of-stake blocks in the background
-    threadGroup.create_thread(boost::bind(&ThreadStakeMinter, pwallet, walletNum, chainman, connman, mempool));
+    staking_threads.emplace_back(std::bind(&ThreadStakeMinter, pwallet, walletNum, chainman, connman, mempool));
+}
+
+/*
+// TODO: allow interruption of individual staking threads
+void StopStakingThread(const unsigned int threadNum)
+{
+    if (threadNum <= staking_threads.size()) {
+        staking_threads_interrupt();
+        staking_threads[threadNum - 1].join();
+    }
+}
+*/
+
+void StopStakingThreads()
+{
+    // Stop all staking threads
+    staking_threads_interrupt();
+    // Clear any UI warnings about staking status
+    SetMintWarning("");
+    uiInterface.NotifyAlertChanged();
+    // Join the staking threads until they have fully exited
+    while (!staking_threads.empty()) {
+        staking_threads.back().join();
+        staking_threads.pop_back();
+    }
 }
 #endif // ENABLE_WALLET

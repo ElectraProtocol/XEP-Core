@@ -285,6 +285,11 @@ public:
     //! to be prepared to handle this by ignoring notifications about unknown
     //! removed transactions and already added new transactions.
     virtual void requestMempoolTransactions(Notifications& notifications) = 0;
+
+#ifdef ENABLE_WALLET
+    //! Stop staking threads.
+    virtual void stopStakingThreads() = 0;
+#endif // ENABLE_WALLET
 };
 
 //! Interface to let node manage chain clients (wallets, or maybe tools for

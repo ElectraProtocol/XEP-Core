@@ -191,6 +191,9 @@ void Shutdown(NodeContext& node)
     util::ThreadRename("shutoff");
     if (node.mempool) node.mempool->AddTransactionsUpdated(1);
 
+#ifdef ENABLE_WALLET
+    StopStakingThreads();
+#endif // ENABLE_WALLET
     StopHTTPRPC();
     StopREST();
     StopRPC();
@@ -2037,7 +2040,7 @@ bool AppInitMain(const util::Ref& context, NodeContext& node, interfaces::BlockA
     std::vector<std::shared_ptr<CWallet>> wallets = GetWallets();
     for (unsigned int i = 0; i < wallets.size(); i++) {
         if (wallets[i])
-            MintStake(threadGroup, wallets[i], i+1, node.chainman, node.connman.get(), node.mempool.get());
+            CreateStakingThread(wallets[i], i+1, node.chainman, node.connman.get(), node.mempool.get());
     }
 #endif // ENABLE_WALLET
 
