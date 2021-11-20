@@ -2447,7 +2447,7 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
         nExpectedBlockReward += nTreasuryPayment;
 
         unsigned int found = 0;
-        for (const std::pair<CScript, unsigned int>& payee : treasuryPayees) {
+        for (const std::pair<const CScript, unsigned int>& payee : treasuryPayees) {
             for (const CTxOut& out : txNew.vout) {
                 if (out.scriptPubKey == payee.first && out.nValue == nTreasuryPayment * payee.second / 100) {
                     nActualTreasuryPayment += out.nValue;
