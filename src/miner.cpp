@@ -121,15 +121,16 @@ static inline void FillTreasuryPayee(CMutableTransaction& txNew, const int nHeig
     if (nTreasuryPayment > 0) {
         const std::map<CScript, unsigned int>& treasuryPayees = consensusParams.mTreasuryPayees;
 
-        for (const std::pair<CScript, unsigned int>& payee : treasuryPayees)
+        for (const std::pair<const CScript, unsigned int>& payee : treasuryPayees) {
             txNew.vout.emplace_back(nTreasuryPayment * payee.second / 100, payee.first);
+        }
     }
 }
 
 Optional<int64_t> BlockAssembler::m_last_block_num_txs{nullopt};
 Optional<int64_t> BlockAssembler::m_last_block_weight{nullopt};
 
-// peercoin: if pwallet != NULL it will attempt to create coinstake
+// peercoin: if pwallet != nullptr it will attempt to create coinstake
 std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, const std::shared_ptr<CWallet>& pwallet, bool* pfPoSCancel)
 {
     int64_t nTimeStart = GetTimeMicros();
@@ -804,35 +805,22 @@ static inline void PoSMiner(const std::shared_ptr<CWallet>& pwallet, ChainstateM
         return;
     }
 
-    try {
-        bool fNeedToClear = false;
-        while (true) {
-            while (pwallet->IsLocked()) {
-                if (GetMintWarning() != strMintWalletMessage) {
-                    SetMintWarning(strMintWalletMessage);
-                    uiInterface.NotifyAlertChanged();
-                }
-                fNeedToClear = true;
-                if (!staking_threads_interrupt.sleep_for(std::chrono::seconds(3)))
-                    return;
+    bool fNeedToClear = false;
+    while (true) {
+        while (pwallet->IsLocked()) {
+            if (GetMintWarning() != strMintWalletMessage) {
+                SetMintWarning(strMintWalletMessage);
+                uiInterface.NotifyAlertChanged();
             }
+            fNeedToClear = true;
+            if (!staking_threads_interrupt.sleep_for(std::chrono::seconds(3)))
+                return;
+        }
 
-            if (Params().NetworkIDString() != CBaseChainParams::REGTEST) { // Params().MiningRequiresPeers()
-                // Busy-wait for the network to come online so we don't waste time mining
-                // on an obsolete chain. In regtest mode we expect to fly solo.
-                while (connman == nullptr || connman->GetNodeCount(CConnman::CONNECTIONS_ALL) == 0 || ::ChainstateActive().IsInitialBlockDownload()) {
-                    if (GetMintWarning() != strMintSyncMessage) {
-                        SetMintWarning(strMintSyncMessage);
-                        uiInterface.NotifyAlertChanged();
-                    }
-                    fNeedToClear = true;
-                    if (!staking_threads_interrupt.sleep_for(std::chrono::seconds(10)))
-                        return;
-                }
-            }
-
-            while (GuessVerificationProgress(Params().TxData(), ::ChainActive().Tip()) < 0.996) {
-                LogPrintf("Minter thread sleeps while sync at %f\n", GuessVerificationProgress(Params().TxData(), ::ChainActive().Tip()));
+        if (Params().NetworkIDString() != CBaseChainParams::REGTEST) { // Params().MiningRequiresPeers()
+            // Busy-wait for the network to come online so we don't waste time mining
+            // on an obsolete chain. In regtest mode we expect to fly solo.
+            while (connman == nullptr || connman->GetNodeCount(CConnman::CONNECTIONS_ALL) == 0 || ::ChainstateActive().IsInitialBlockDownload()) {
                 if (GetMintWarning() != strMintSyncMessage) {
                     SetMintWarning(strMintSyncMessage);
                     uiInterface.NotifyAlertChanged();
@@ -841,77 +829,81 @@ static inline void PoSMiner(const std::shared_ptr<CWallet>& pwallet, ChainstateM
                 if (!staking_threads_interrupt.sleep_for(std::chrono::seconds(10)))
                     return;
             }
-            if (fNeedToClear) {
-                SetMintWarning("");
+        }
+
+        while (GuessVerificationProgress(Params().TxData(), ::ChainActive().Tip()) < 0.996) {
+            LogPrintf("Minter thread sleeps while sync at %f\n", GuessVerificationProgress(Params().TxData(), ::ChainActive().Tip()));
+            if (GetMintWarning() != strMintSyncMessage) {
+                SetMintWarning(strMintSyncMessage);
                 uiInterface.NotifyAlertChanged();
-                fNeedToClear = false;
             }
-
-            //
-            // Create new block
-            //
-            CBlockIndex* pindexPrev = ::ChainActive().Tip();
-            bool fPoSCancel = false;
-            CBlock *pblock;
-            std::unique_ptr<CBlockTemplate> pblocktemplate;
-
-            {
-                LOCK(pwallet->cs_wallet);
-
-                pblocktemplate = BlockAssembler(*mempool, Params()).CreateNewBlock(CScript(), pwallet, &fPoSCancel);
-            }
-
-            if (!pblocktemplate.get()) {
-                if (fPoSCancel == true) {
-                    if (!staking_threads_interrupt.sleep_for(std::chrono::milliseconds(pos_timio)))
-                        return;
-                    continue;
-                }
-                SetMintWarning(strMintBlockMessage);
-                uiInterface.NotifyAlertChanged();
-                LogPrintf("Error in XEPMiner: Keypool ran out, please call keypoolrefill before restarting the staking thread\n");
-                if (!staking_threads_interrupt.sleep_for(std::chrono::seconds(10)))
-                   return;
-
-                return;
-            }
-            pblock = &pblocktemplate->block;
-            CPubKey signingPubKey;
-            bool pubkeyInSig = true;
-            {
-                LOCK(pwallet->cs_wallet);
-
-                if (!pwallet->GetBlockSigningPubKey(*pblock, signingPubKey, pubkeyInSig)) {
-                    LogPrintf("PoSMiner(): failed to get signing pubkey for PoS block\n");
-                    continue;
-                }
-            }
-            IncrementExtraNonce(pblock, pindexPrev, nExtraNonce, pubkeyInSig ? nullptr : &signingPubKey);
-
-            // peercoin: if proof-of-stake block found then process block
-            {
-                LOCK(pwallet->cs_wallet);
-
-                if (!pwallet->SignBlock(*pblock, signingPubKey)) {
-                    LogPrintf("PoSMiner(): failed to sign PoS block\n");
-                    continue;
-                }
-            }
-            LogPrintf("CPUMiner : proof-of-stake block found %s\n", pblock->GetHash().ToString());
-            ProcessBlockFound(pblock, Params(), chainman);
-            // Rest for ~3 minutes after successful block to preserve close quick
-            if (!staking_threads_interrupt.sleep_for(std::chrono::seconds(60 + GetRand(4))))
-                return;
-            if (!staking_threads_interrupt.sleep_for(std::chrono::milliseconds(pos_timio)))
+            fNeedToClear = true;
+            if (!staking_threads_interrupt.sleep_for(std::chrono::seconds(10)))
                 return;
         }
-    } catch (const std::runtime_error &e) {
-        LogPrintf("XEPMiner runtime error: %s\n", e.what());
-        return;
-    } catch (...) {
-        LogPrintf("XEPMiner terminated\n");
-        return;
-        // throw;
+        if (fNeedToClear) {
+            ClearMintWarning();
+            uiInterface.NotifyAlertChanged();
+            fNeedToClear = false;
+        }
+
+        //
+        // Create new block
+        //
+        CBlockIndex* pindexPrev = ::ChainActive().Tip();
+        bool fPoSCancel = false;
+        CBlock *pblock;
+        std::unique_ptr<CBlockTemplate> pblocktemplate;
+
+        {
+            LOCK(pwallet->cs_wallet);
+
+            pblocktemplate = BlockAssembler(*mempool, Params()).CreateNewBlock(CScript(), pwallet, &fPoSCancel);
+        }
+
+        if (!pblocktemplate.get()) {
+            if (fPoSCancel == true) {
+                if (!staking_threads_interrupt.sleep_for(std::chrono::milliseconds(pos_timio)))
+                    return;
+                continue;
+            }
+            SetMintWarning(strMintBlockMessage);
+            uiInterface.NotifyAlertChanged();
+            LogPrintf("Error in XEPMiner: Keypool ran out, please call keypoolrefill before restarting the staking thread\n");
+            if (!staking_threads_interrupt.sleep_for(std::chrono::seconds(10)))
+               return;
+
+            return;
+        }
+        pblock = &pblocktemplate->block;
+        CPubKey signingPubKey;
+        bool pubkeyInSig = true;
+        {
+            LOCK(pwallet->cs_wallet);
+
+            if (!pwallet->GetBlockSigningPubKey(*pblock, signingPubKey, pubkeyInSig)) {
+                LogPrintf("PoSMiner(): failed to get signing pubkey for PoS block\n");
+                continue;
+            }
+        }
+        IncrementExtraNonce(pblock, pindexPrev, nExtraNonce, pubkeyInSig ? nullptr : &signingPubKey);
+
+        // peercoin: if proof-of-stake block found then process block
+        {
+            LOCK(pwallet->cs_wallet);
+
+            if (!pwallet->SignBlock(*pblock, signingPubKey)) {
+                LogPrintf("PoSMiner(): failed to sign PoS block\n");
+                continue;
+            }
+        }
+        LogPrintf("CPUMiner : proof-of-stake block found %s\n", pblock->GetHash().ToString());
+        ProcessBlockFound(pblock, Params(), chainman);
+        // Rest for ~3 minutes after successful block to preserve close quick
+        if (!staking_threads_interrupt.sleep_for(std::chrono::seconds(60 + GetRand(4))))
+            return;
+        if (!staking_threads_interrupt.sleep_for(std::chrono::milliseconds(pos_timio)))
+            return;
     }
 }
 
@@ -920,13 +912,9 @@ static void ThreadStakeMinter(const std::shared_ptr<CWallet>& pwallet, const uns
 {
     util::ThreadRename("xep-stake-minter-" + std::to_string(walletNum));
     LogPrintf("ThreadStakeMinter #%u started\n", walletNum);
-    try {
-        PoSMiner(pwallet, chainman, connman, mempool);
-    } catch (std::exception& e) {
-        PrintExceptionContinue(&e, "ThreadStakeMinter()");
-    } catch (...) {
-        PrintExceptionContinue(NULL, "ThreadStakeMinter()");
-    }
+
+    PoSMiner(pwallet, chainman, connman, mempool);
+
     LogPrintf("ThreadStakeMinter #%u exiting\n", walletNum);
 }
 
@@ -952,13 +940,13 @@ void StopStakingThreads()
 {
     // Stop all staking threads
     staking_threads_interrupt();
-    // Clear any UI warnings about staking status
-    SetMintWarning("");
-    uiInterface.NotifyAlertChanged();
     // Join the staking threads until they have fully exited
     while (!staking_threads.empty()) {
         staking_threads.back().join();
         staking_threads.pop_back();
     }
+    // Clear any UI warnings about staking status
+    ClearMintWarning();
+    uiInterface.NotifyAlertChanged();
 }
 #endif // ENABLE_WALLET
