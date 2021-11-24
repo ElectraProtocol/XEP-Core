@@ -227,6 +227,16 @@
            </widget>
           </item>
           <item>
+           <widget class="QCheckBox" name="quantumSafeStaking">
+            <property name="toolTip">
+             <string>If this option is enabled, the wallet will generate new addresses while staking in order to increase security against quantum computers. Please remember to back up your wallet often if you stake every day!</string>
+            </property>
+            <property name="text">
+             <string>Enable &amp;quantum safe staking</string>
+            </property>
+           </widget>
+          </item>
+          <item>
            <layout class="QHBoxLayout" name="horizontalLayout_1_Wallet">
             <item>
              <widget class="QLabel" name="targetStakeInputsLabel">
