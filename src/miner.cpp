@@ -738,8 +738,25 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, const std
                 } else if (nTargetStakeInputs == 0) {
                     outputs = std::max(nCredit / nAutomaticInputSize, static_cast<int64_t>(1));
                 }
-                for (unsigned int i = 0; i < outputs; i++) {
-                    coinstakeTx.vout.push_back(CTxOut(nCredit / outputs, scriptPubKeyOut));
+
+                // Fill outputs in coinstake
+                if (gArgs.GetBoolArg("-quantumsafestaking", false)) {
+                    coinstakeTx.vout.push_back(CTxOut(nCredit / outputs, scriptPubKeyOut)); // fill first output with new bech32 address generated above
+
+                    OutputType output_type = OutputType::BECH32;
+                    CTxDestination dest;
+                    std::string error;
+                    for (unsigned int i = 1; i < outputs; i++) {
+                        if (pwallet->GetNewChangeDestination(output_type, dest, error)) {
+                            coinstakeTx.vout.push_back(CTxOut(nCredit / outputs, GetScriptForDestination(dest)));
+                        } else {
+                            coinstakeTx.vout.push_back(CTxOut(nCredit / outputs, scriptPubKeyOut));
+                        }
+                    }
+                } else {
+                    for (unsigned int i = 0; i < outputs; i++) {
+                        coinstakeTx.vout.push_back(CTxOut(nCredit / outputs, scriptPubKeyOut));
+                    }
                 }
 
                 // Add treasury payment
