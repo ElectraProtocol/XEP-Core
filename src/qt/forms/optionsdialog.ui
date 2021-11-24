@@ -231,7 +231,7 @@
             <item>
              <widget class="QLabel" name="targetStakeInputsLabel">
               <property name="text">
-               <string>Target number of stake inputs to maintain</string>
+               <string>&amp;Target number of stake inputs to maintain</string>
               </property>
               <property name="textFormat">
                <enum>Qt::PlainText</enum>
