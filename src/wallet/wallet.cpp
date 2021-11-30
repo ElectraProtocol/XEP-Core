@@ -3410,6 +3410,28 @@ bool CWallet::GetNewChangeDestination(const OutputType type, CTxDestination& des
     return true;
 }
 
+bool CWallet::GetNewStakingDestination(CTxDestination& dest, std::string& error)
+{
+    LOCK(cs_wallet);
+    error.clear();
+
+    // Since the BIP32 key derivation also uses ECDSA to generate parent keys, exposing the extended public keys
+    // would allow an early quantum computer which can derive a private key from an ECDSA public key in a matter
+    // of months or weeks to also derive the private keys for all child addresses simultaneously and render any
+    // potential protection provided by using pubkey hash addresses immaterial, regardless of whether hardened or
+    // non-hardened child key derivation is used.
+    // See https://bitcointalk.org/index.php?topic=1652854.msg16608144#msg16608144
+    auto spk_man = GetScriptPubKeyMan(OutputType::BECH32, false /* internal */);
+    if (spk_man) {
+        // Don't spam the address book with single use staking addresses
+        spk_man->TopUp();
+        return spk_man->GetNewDestination(OutputType::BECH32, dest, error);
+    } else {
+        error = strprintf("Error: No %s addresses available.", FormatOutputType(OutputType::BECH32));
+        return false;
+    }
+}
+
 int64_t CWallet::GetOldestKeyPoolTime() const
 {
     LOCK(cs_wallet);

@@ -632,10 +632,9 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, const std
                     }
 
                     if (gArgs.GetBoolArg("-quantumsafestaking", false)) { // a new bech32 address is generated for every stake to protect the public key from quantum computers
-                        OutputType output_type = OutputType::BECH32;
                         CTxDestination dest;
                         std::string error;
-                        if (pwallet->GetNewChangeDestination(output_type, dest, error)) {
+                        if (pwallet->GetNewStakingDestination(dest, error)) {
                             LogPrintf("%s : using new destination for coinstake (%s)\n", __func__, EncodeDestination(dest));
                             scriptPubKeyOut = GetScriptForDestination(dest);
                         } else {
@@ -643,10 +642,9 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, const std
                             scriptPubKeyOut = scriptPubKeyKernel;
                         }
                     } else if (whichType == TxoutType::MULTISIG || whichType == TxoutType::MULTISIG_REPLAY || whichType == TxoutType::MULTISIG_DATA || whichType == TxoutType::MULTISIG_DATA_REPLAY) { // try to create a new destination for p2sh/p2wsh-multisig inputs
-                        OutputType output_type = OutputType::BECH32;
                         CTxDestination dest;
                         std::string error;
-                        if (pwallet->GetNewChangeDestination(output_type, dest, error)) {
+                        if (pwallet->GetNewChangeDestination(OutputType::BECH32, dest, error)) {
                             LogPrintf("%s : using new destination for coinstake (%s)\n", __func__, EncodeDestination(dest));
                             scriptPubKeyOut = GetScriptForDestination(dest);
                         } else
@@ -743,11 +741,10 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, const std
                 if (gArgs.GetBoolArg("-quantumsafestaking", false)) {
                     coinstakeTx.vout.push_back(CTxOut(nCredit / outputs, scriptPubKeyOut)); // fill first output with new bech32 address generated above
 
-                    OutputType output_type = OutputType::BECH32;
                     CTxDestination dest;
                     std::string error;
                     for (unsigned int i = 1; i < outputs; i++) {
-                        if (pwallet->GetNewChangeDestination(output_type, dest, error)) {
+                        if (pwallet->GetNewStakingDestination(dest, error)) {
                             coinstakeTx.vout.push_back(CTxOut(nCredit / outputs, GetScriptForDestination(dest)));
                         } else {
                             coinstakeTx.vout.push_back(CTxOut(nCredit / outputs, scriptPubKeyOut));
