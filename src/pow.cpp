@@ -245,25 +245,19 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
     if (nHeight < nASERTStartHeight)
         return WeightedTargetExponentialMovingAverage(pindexLast, pblock, params);
 
-    uint32_t nBlocksPassed = 0;
-    int64_t refBlockTimestamp;
-    uint32_t refBlockBits;
-    if (nHeight > static_cast<uint32_t>(params.nLastPoWBlock)) { // If we are past the last PoW block, we can get the number of PoS blocks in the chain by simply using the block height instead of performing the expensive looping below
-        // The last PoW block is at height 148953 with 3079 PoW blocks in the chain at this point, but we need to subtract one because we cannot count the current block as having "passed" yet
-        nBlocksPassed = nHeight - 3078; // TODO: replace with a cache of actual PoW/PoS block counts
-        // Using a static variable concurrently in this context is safe and will not cause a race condition during initialization because C++11 guarantees that static variables will be initialized exactly once
-        static const CBlockIndex* const pindexReferenceBlock = GetASERTReferenceBlockForAlgo(pindexPrev, nASERTStartHeight, algo);
-        const CBlockIndex* const pindexReferenceBlockPrev = algo == -1 ? GetLastBlockIndex(pindexReferenceBlock->pprev, fProofOfStake) : GetLastBlockIndexForAlgo(pindexReferenceBlock->pprev, algo);
-        // Use reference block's parent block's timestamp unless it is the genesis (not using the prev timestamp here would put us permanently one block behind schedule)
-        refBlockTimestamp = pindexReferenceBlockPrev ? pindexReferenceBlockPrev->GetBlockTime() : (pindexReferenceBlock->GetBlockTime() - nTargetSpacing);
-        refBlockBits = pindexReferenceBlock->nBits;
-    } else {
-        const CBlockIndex* const pindexReferenceBlock = GetASERTReferenceBlockAndHeightForAlgo(pindexPrev, nProofOfWorkLimit, nASERTStartHeight, algo, nBlocksPassed);
-        const CBlockIndex* const pindexReferenceBlockPrev = algo == -1 ? GetLastBlockIndex(pindexReferenceBlock->pprev, fProofOfStake) : GetLastBlockIndexForAlgo(pindexReferenceBlock->pprev, algo);
-        // Use reference block's parent block's timestamp unless it is the genesis (not using the prev timestamp here would put us permanently one block behind schedule)
-        refBlockTimestamp = pindexReferenceBlockPrev ? pindexReferenceBlockPrev->GetBlockTime() : (pindexReferenceBlock->GetBlockTime() - nTargetSpacing);
-        refBlockBits = pindexReferenceBlock->nBits;
-    }
+    const uint32_t nBlocksPassed = (fProofOfStake ? pindexLast->nHeightPoS : pindexLast->nHeightPoW) + 1; // Account for the ASERT reference block by adding one to the height
+
+    // Using a static variable concurrently in this context is safe and will not cause a race condition during initialization because C++11 guarantees that static variables will be initialized exactly once
+    static const CBlockIndex* const pindexReferenceBlocks[CBlockHeader::AlgoType::ALGO_COUNT] = {
+        GetASERTReferenceBlockForAlgo(pindexPrev, nASERTStartHeight, CBlockHeader::AlgoType::ALGO_POS),
+        GetASERTReferenceBlockForAlgo(pindexPrev, nASERTStartHeight, CBlockHeader::AlgoType::ALGO_POW_SHA256),
+    };
+
+    const CBlockIndex* const pindexReferenceBlock = fAlgoMissing ? pindexReferenceBlocks[fProofOfStake ? CBlockHeader::AlgoType::ALGO_POS : CBlockHeader::AlgoType::ALGO_POW_SHA256] : pindexReferenceBlocks[algo];
+    const CBlockIndex* const pindexReferenceBlockPrev = fAlgoMissing ? GetLastBlockIndex(pindexReferenceBlock->pprev, fProofOfStake) : GetLastBlockIndexForAlgo(pindexReferenceBlock->pprev, algo);
+
+    // Use reference block's parent block's timestamp unless it is the genesis (not using the prev timestamp here would put us permanently one block behind schedule)
+    int64_t refBlockTimestamp = pindexReferenceBlockPrev ? pindexReferenceBlockPrev->GetBlockTime() : (pindexReferenceBlock->GetBlockTime() - nTargetSpacing);
 
     // The reference timestamp must be divisible by (nStakeTimestampMask+1) or else the PoS block emission will never be exactly on schedule
     if (fProofOfStake) {
@@ -326,14 +320,14 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
         } else {
             if (fUseCache && !fAlgoMissing) {
                 if (nTargetCacheHeight != -1 || nTargetCacheAlgo != algo || refBlockTargetCache == arith_uint256()) {
-                    refBlockTargetCache = arith_uint256().SetCompactBase256(refBlockBits);
+                    refBlockTargetCache = arith_uint256().SetCompactBase256(pindexReferenceBlock->nBits);
                     nTargetCacheHeight = -1;
                     nTargetCacheAlgo = algo;
                     //LogPrintf("Set ref target cache at nHeight = %u with algo = %i\n", nHeight, algo);
                 }
                 refBlockTarget = refBlockTargetCache;
             } else
-                refBlockTarget = arith_uint256().SetCompactBase256(refBlockBits);
+                refBlockTarget = arith_uint256().SetCompactBase256(pindexReferenceBlock->nBits);
         }
     }
 
