@@ -3469,8 +3469,16 @@ CBlockIndex* BlockManager::AddToBlockIndex(const CBlockHeader& block)
         pindexNew->BuildSkip();
     }
     pindexNew->nTimeMax = (pindexNew->pprev ? std::max(pindexNew->pprev->nTimeMax, pindexNew->nTime) : pindexNew->nTime);
-    if (block.IsProofOfStake())
+    if (block.IsProofOfStake()) {
         pindexNew->SetProofOfStake();
+        if (pindexNew->pprev) { // Increase the count of PoS blocks in the chain
+            pindexNew->nHeightPoW = pindexNew->pprev->nHeightPoW;
+            pindexNew->nHeightPoS = pindexNew->pprev->nHeightPoS + 1;
+        }
+    } else if (pindexNew->pprev) { // Increase the count of PoW blocks in the chain
+        pindexNew->nHeightPoW = pindexNew->pprev->nHeightPoW + 1;
+        pindexNew->nHeightPoS = pindexNew->pprev->nHeightPoS;
+    }
     if (IsTreasuryBlock(pindexNew->nHeight, Params().GetConsensus()))
         pindexNew->SetTreasuryBlock();
     pindexNew->nChainWork = (pindexNew->pprev ? pindexNew->pprev->nChainWork : 0) + GetBlockProof(*pindexNew);
