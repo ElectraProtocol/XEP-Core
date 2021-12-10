@@ -33,12 +33,13 @@
 #include <warnings.h>
 
 #include <algorithm>
+#include <forward_list>
 #include <thread>
 #include <utility>
 
 #ifdef ENABLE_WALLET
 static std::vector<std::thread> staking_threads;
-static CThreadInterrupt staking_threads_interrupt;
+static std::forward_list<CThreadInterrupt> staking_thread_interrupters;
 #endif // ENABLE_WALLET
 int64_t nLastCoinStakeSearchInterval = 0;
 
@@ -790,7 +791,7 @@ static inline bool ProcessBlockFound(const CBlock* pblock, const CChainParams& c
     return true;
 }
 
-static inline void PoSMiner(const std::shared_ptr<CWallet>& pwallet, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool)
+static inline void PoSMiner(const std::shared_ptr<CWallet>& pwallet, CThreadInterrupt& interrupter, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool)
 {
     LogPrintf("CPUMiner started for proof-of-stake\n");
 
@@ -827,7 +828,7 @@ static inline void PoSMiner(const std::shared_ptr<CWallet>& pwallet, ChainstateM
                 uiInterface.NotifyAlertChanged();
             }
             fNeedToClear = true;
-            if (!staking_threads_interrupt.sleep_for(std::chrono::seconds(3)))
+            if (!interrupter.sleep_for(std::chrono::seconds(3)))
                 return;
         }
 
@@ -840,7 +841,7 @@ static inline void PoSMiner(const std::shared_ptr<CWallet>& pwallet, ChainstateM
                     uiInterface.NotifyAlertChanged();
                 }
                 fNeedToClear = true;
-                if (!staking_threads_interrupt.sleep_for(std::chrono::seconds(10)))
+                if (!interrupter.sleep_for(std::chrono::seconds(10)))
                     return;
             }
         }
@@ -852,7 +853,7 @@ static inline void PoSMiner(const std::shared_ptr<CWallet>& pwallet, ChainstateM
                 uiInterface.NotifyAlertChanged();
             }
             fNeedToClear = true;
-            if (!staking_threads_interrupt.sleep_for(std::chrono::seconds(10)))
+            if (!interrupter.sleep_for(std::chrono::seconds(10)))
                 return;
         }
         if (fNeedToClear) {
@@ -877,14 +878,14 @@ static inline void PoSMiner(const std::shared_ptr<CWallet>& pwallet, ChainstateM
 
         if (!pblocktemplate.get()) {
             if (fPoSCancel == true) {
-                if (!staking_threads_interrupt.sleep_for(std::chrono::milliseconds(pos_timio)))
+                if (!interrupter.sleep_for(std::chrono::milliseconds(pos_timio)))
                     return;
                 continue;
             }
             SetMintWarning(strMintBlockMessage);
             uiInterface.NotifyAlertChanged();
             LogPrintf("Error in XEPMiner: Keypool ran out, please call keypoolrefill before restarting the staking thread\n");
-            if (!staking_threads_interrupt.sleep_for(std::chrono::seconds(10)))
+            if (!interrupter.sleep_for(std::chrono::seconds(10)))
                return;
 
             return;
@@ -914,29 +915,34 @@ static inline void PoSMiner(const std::shared_ptr<CWallet>& pwallet, ChainstateM
         LogPrintf("CPUMiner : proof-of-stake block found %s\n", pblock->GetHash().ToString());
         ProcessBlockFound(pblock, Params(), chainman);
         // Rest for ~3 minutes after successful block to preserve close quick
-        if (!staking_threads_interrupt.sleep_for(std::chrono::seconds(60 + GetRand(4))))
+        if (!interrupter.sleep_for(std::chrono::seconds(60 + GetRand(4))))
             return;
-        if (!staking_threads_interrupt.sleep_for(std::chrono::milliseconds(pos_timio)))
+        if (!interrupter.sleep_for(std::chrono::milliseconds(pos_timio)))
             return;
     }
 }
 
 // peercoin: stake minter thread
-static void ThreadStakeMinter(const std::shared_ptr<CWallet>& pwallet, const unsigned int walletNum, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool)
+static void ThreadStakeMinter(const std::shared_ptr<CWallet>& pwallet, const unsigned int threadNum, CThreadInterrupt* interrupter, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool)
 {
-    util::ThreadRename("xep-stake-minter-" + std::to_string(walletNum));
-    LogPrintf("ThreadStakeMinter #%u started\n", walletNum);
+    util::ThreadRename("xep-stake-minter-" + std::to_string(threadNum));
+    LogPrintf("ThreadStakeMinter #%u started\n", threadNum);
 
-    PoSMiner(pwallet, chainman, connman, mempool);
+    assert(interrupter);
+    PoSMiner(pwallet, *interrupter, chainman, connman, mempool);
 
-    LogPrintf("ThreadStakeMinter #%u exiting\n", walletNum);
+    LogPrintf("ThreadStakeMinter #%u exiting\n", threadNum);
 }
 
 // peercoin: stake minter
-void CreateStakingThread(const std::shared_ptr<CWallet>& pwallet, const unsigned int walletNum, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool)
+void CreateStakingThread(const std::shared_ptr<CWallet>& pwallet, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool)
 {
+    static std::atomic_uint threadNum{1};
+
     // peercoin: mint proof-of-stake blocks in the background
-    staking_threads.emplace_back(std::bind(&ThreadStakeMinter, pwallet, walletNum, chainman, connman, mempool));
+    staking_thread_interrupters.emplace_front();
+    staking_threads.emplace_back(std::bind(&ThreadStakeMinter, pwallet, threadNum.load(), &staking_thread_interrupters.front(), chainman, connman, mempool));
+    threadNum++;
 }
 
 /*
@@ -944,7 +950,7 @@ void CreateStakingThread(const std::shared_ptr<CWallet>& pwallet, const unsigned
 void StopStakingThread(const unsigned int threadNum)
 {
     if (threadNum <= staking_threads.size()) {
-        staking_threads_interrupt();
+        interrupter();
         staking_threads[threadNum - 1].join();
     }
 }
@@ -953,7 +959,10 @@ void StopStakingThread(const unsigned int threadNum)
 void StopStakingThreads()
 {
     // Stop all staking threads
-    staking_threads_interrupt();
+    while (!staking_thread_interrupters.empty()) {
+        staking_thread_interrupters.front()();
+        staking_thread_interrupters.pop_front();
+    }
     // Join the staking threads until they have fully exited
     while (!staking_threads.empty()) {
         staking_threads.back().join();
