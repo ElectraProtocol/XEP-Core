@@ -38,6 +38,9 @@
 #include <utility>
 
 #ifdef ENABLE_WALLET
+#include <mutex>
+
+Mutex cs_thread_containers;
 static std::vector<std::thread> staking_threads;
 static std::forward_list<CThreadInterrupt> staking_thread_interrupters;
 #endif // ENABLE_WALLET
@@ -937,11 +940,13 @@ static void ThreadStakeMinter(const std::shared_ptr<CWallet>& pwallet, const uns
 // peercoin: stake minter
 void CreateStakingThread(const std::shared_ptr<CWallet>& pwallet, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool)
 {
-    static std::atomic_uint threadNum{1};
+    LOCK(cs_thread_containers);
+
+    static unsigned int threadNum{1};
 
     // peercoin: mint proof-of-stake blocks in the background
     staking_thread_interrupters.emplace_front();
-    staking_threads.emplace_back(std::bind(&ThreadStakeMinter, pwallet, threadNum.load(), &staking_thread_interrupters.front(), chainman, connman, mempool));
+    staking_threads.emplace_back(std::bind(&ThreadStakeMinter, pwallet, threadNum, &staking_thread_interrupters.front(), chainman, connman, mempool));
     threadNum++;
 }
 
@@ -949,6 +954,8 @@ void CreateStakingThread(const std::shared_ptr<CWallet>& pwallet, ChainstateMana
 // TODO: allow interruption of individual staking threads
 void StopStakingThread(const unsigned int threadNum)
 {
+    LOCK(cs_thread_containers);
+
     if (threadNum <= staking_threads.size()) {
         interrupter();
         staking_threads[threadNum - 1].join();
@@ -958,6 +965,8 @@ void StopStakingThread(const unsigned int threadNum)
 
 void StopStakingThreads()
 {
+    LOCK(cs_thread_containers);
+
     // Stop all staking threads
     while (!staking_thread_interrupters.empty()) {
         staking_thread_interrupters.front()();
