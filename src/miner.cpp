@@ -40,9 +40,9 @@
 #ifdef ENABLE_WALLET
 #include <mutex>
 
-Mutex cs_thread_containers;
-static std::vector<std::thread> staking_threads;
-static std::forward_list<CThreadInterrupt> staking_thread_interrupters;
+static Mutex cs_thread_containers;
+static std::vector<std::thread> staking_threads GUARDED_BY(cs_thread_containers);
+static std::forward_list<CThreadInterrupt> staking_thread_interrupters GUARDED_BY(cs_thread_containers);
 #endif // ENABLE_WALLET
 int64_t nLastCoinStakeSearchInterval = 0;
 
