@@ -15,7 +15,7 @@
 
 #include <mutex>
 
-Mutex cs_target_cache;
+static Mutex cs_target_cache;
 
 // peercoin: find last block index up to pindex
 static inline const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, const bool fProofOfStake)
