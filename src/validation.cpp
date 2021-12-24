@@ -2074,40 +2074,44 @@ static inline bool ContextualCheckPoSBlock(const CBlock& block, const bool& fPro
     //fGeneratedStakeModifier = true;
 
   // compute nStakeModifierChecksum begin
-    /*unsigned int nFlagsBackup      = pindex->nFlags;
-    uint64_t nStakeModifierBackup  = pindex->nStakeModifier;
-    uint256 hashProofOfStakeBackup = pindex->hashProofOfStake;
+    const unsigned int nFlagsBackup      = pindex->nFlags;
+    const uint64_t nStakeModifierBackup  = pindex->nStakeModifier;
+    const uint256 hashProofOfStakeBackup = pindex->hashProofOfStake;
 
     // set necessary pindex fields
     if (!pindex->SetStakeEntropyBit(nEntropyBit))
         return error("ConnectBlock(): SetStakeEntropyBit() failed");
     pindex->SetStakeModifier(nStakeModifier, fGeneratedStakeModifier);
-    pindex->hashProofOfStake = hashProofOfStake;
+    if (fProofOfStake) {
+        pindex->hashProofOfStake = hashProofOfStake;
+    }
 
-    unsigned int nStakeModifierChecksum = GetStakeModifierChecksum(pindex);
+    const unsigned int nStakeModifierChecksum = GetStakeModifierChecksum(pindex);
 
     // undo pindex fields
     pindex->nFlags           = nFlagsBackup;
     pindex->nStakeModifier   = nStakeModifierBackup;
-    pindex->hashProofOfStake = hashProofOfStakeBackup;
+    if (fProofOfStake) {
+        pindex->hashProofOfStake = hashProofOfStakeBackup;
+    }
   // compute nStakeModifierChecksum end
 
     if (!CheckStakeModifierCheckpoints(pindex->nHeight, nStakeModifierChecksum))
-        return error("ConnectBlock(): Rejected by stake modifier checkpoint height=%d, modifier=0x%016llx", pindex->nHeight, nStakeModifier);*/
+        return error("ConnectBlock(): Rejected by stake modifier checkpoint height=%d, modifier=0x%016llx", pindex->nHeight, nStakeModifier);
 
     if (fJustCheck)
         return true;
 
 
     // write everything to index
-    if (fProofOfStake) {
-        pindex->hashProofOfStake = hashProofOfStake;
-    }
     if (!pindex->SetStakeEntropyBit(nEntropyBit))
         return error("ConnectBlock(): SetStakeEntropyBit() failed");
     pindex->SetStakeModifier(nStakeModifier, fGeneratedStakeModifier);
     //pindex->SetStakeModifierV2(nStakeModifierV2, fGeneratedStakeModifier);
-    //pindex->nStakeModifierChecksum = nStakeModifierChecksum;
+    if (fProofOfStake) {
+        pindex->hashProofOfStake = hashProofOfStake;
+    }
+    pindex->nStakeModifierChecksum = nStakeModifierChecksum;
     setDirtyBlockIndex.insert(pindex);  // queue a write to disk
 
     return true;
@@ -4529,10 +4533,10 @@ bool BlockManager::LoadBlockIndex(
             pindexBestHeader = pindex;
 
         // peercoin: calculate stake modifier checksum
-        //pindex->nStakeModifierChecksum = GetStakeModifierChecksum(pindex);
-        //if (::ChainActive().Contains(pindex))
-            //if (!CheckStakeModifierCheckpoints(pindex->nHeight, pindex->nStakeModifierChecksum))
-                //return error("LoadBlockIndex() : Failed stake modifier checkpoint height=%d, modifier=0x%016llx", pindex->nHeight, pindex->nStakeModifier);
+        pindex->nStakeModifierChecksum = GetStakeModifierChecksum(pindex);
+        if (::ChainActive().Contains(pindex))
+            if (!CheckStakeModifierCheckpoints(pindex->nHeight, pindex->nStakeModifierChecksum))
+                return error("LoadBlockIndex() : Failed stake modifier checkpoint height=%d, modifier=0x%016llx", pindex->nHeight, pindex->nStakeModifier);
     }
 
     return true;

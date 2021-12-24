@@ -17,18 +17,12 @@
 #include <util/system.h>
 #include <validation.h>
 
-#include <boost/assign/list_of.hpp>
-
 // Hard checkpoints of stake modifiers to ensure they are deterministic
-static std::map<int, unsigned int> mapStakeModifierCheckpoints =
-    boost::assign::map_list_of
-    ( 0, 0xfd11f4e7u )
-    ;
+static std::map<int, unsigned int> mapStakeModifierCheckpoints = {
+};
 
-static std::map<int, unsigned int> mapStakeModifierTestnetCheckpoints =
-    boost::assign::map_list_of
-    ( 0, 0xfd11f4e7u )
-    ;
+static std::map<int, unsigned int> mapStakeModifierTestnetCheckpoints = {
+};
 
 // Get the last stake modifier and its generation time from a given block
 static bool GetLastStakeModifier(const CBlockIndex* pindex, uint64_t& nStakeModifier, int64_t& nModifierTime)
@@ -660,18 +654,22 @@ bool CheckCoinStakeTimestamp(int64_t nTimeBlock, int64_t nTimeTx)
 }
 
 // Get stake modifier checksum
-/*unsigned int GetStakeModifierChecksum(const CBlockIndex* pindex)
+unsigned int GetStakeModifierChecksum(const CBlockIndex* pindex)
 {
     assert(pindex->pprev || pindex->GetBlockHash() == Params().GetConsensus().hashGenesisBlock);
     // Hash previous checksum with flags, hashProofOfStake and nStakeModifier
     CDataStream ss(SER_GETHASH, 0);
     if (pindex->pprev)
         ss << pindex->pprev->nStakeModifierChecksum;
-    ss << pindex->nFlags << pindex->hashProofOfStake << pindex->nStakeModifier;
+    ss << pindex->nFlags << pindex->hashProofOfStake;
+    if (pindex->UsesStakeModifierV2())
+        ss << pindex->nStakeModifierV2;
+    else
+        ss << pindex->nStakeModifier;
     arith_uint256 hashChecksum = UintToArith256(Hash(ss));
     hashChecksum >>= (256 - 32);
     return hashChecksum.GetLow64();
-}*/
+}
 
 // Check stake modifier hard checkpoints
 bool CheckStakeModifierCheckpoints(int nHeight, unsigned int nStakeModifierChecksum)

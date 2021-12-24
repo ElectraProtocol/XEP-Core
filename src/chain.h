@@ -197,7 +197,7 @@ public:
     int64_t nTreasuryPayment{0};
 
     // peercoin: proof-of-stake related block index fields
-    unsigned int nFlags{0};  // peercoin: block index flags
+    unsigned int nFlags{0}; // peercoin: block index flags
     enum
     {
         BLOCK_PROOF_OF_STAKE = (1 << 0), // is proof-of-stake block
@@ -208,7 +208,7 @@ public:
     };
     uint64_t nStakeModifier{0}; // hash modifier for proof-of-stake
     uint256 nStakeModifierV2{}; // hash modifier for proof-of-stake
-    //unsigned int nStakeModifierChecksum{0}; // checksum of index; in-memory only
+    unsigned int nStakeModifierChecksum{0}; // checksum of index; in-memory only
     uint256 hashProofOfStake{};
 
     bool IsProofOfWork() const

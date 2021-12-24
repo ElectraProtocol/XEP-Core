@@ -41,7 +41,7 @@ bool CheckProofOfStake(BlockValidationState& state, const CCoinsViewCache& view,
 bool CheckCoinStakeTimestamp(int64_t nTimeBlock, int64_t nTimeTx);
 
 // Get stake modifier checksum
-//unsigned int GetStakeModifierChecksum(const CBlockIndex* pindex);
+unsigned int GetStakeModifierChecksum(const CBlockIndex* pindex);
 
 // Check stake modifier hard checkpoints
 bool CheckStakeModifierCheckpoints(int nHeight, unsigned int nStakeModifierChecksum);
