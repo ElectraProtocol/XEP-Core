@@ -2100,12 +2100,9 @@ static inline bool ContextualCheckPoSBlock(const CBlock& block, const bool& fPro
 
 
     // write everything to index
-    /*if (fProofOfStake)
-    {
-        pindex->prevoutStake = block.vtx[1]->vin[0].prevout;
-        pindex->nStakeTime = block.vtx[1]->nTime;
+    if (fProofOfStake) {
         pindex->hashProofOfStake = hashProofOfStake;
-    }*/
+    }
     if (!pindex->SetStakeEntropyBit(nEntropyBit))
         return error("ConnectBlock(): SetStakeEntropyBit() failed");
     pindex->SetStakeModifier(nStakeModifier, fGeneratedStakeModifier);

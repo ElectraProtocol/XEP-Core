@@ -209,9 +209,7 @@ public:
     uint64_t nStakeModifier{0}; // hash modifier for proof-of-stake
     uint256 nStakeModifierV2{}; // hash modifier for proof-of-stake
     //unsigned int nStakeModifierChecksum{0}; // checksum of index; in-memory only
-    //COutPoint prevoutStake{};
-    //unsigned int nStakeTime{0};
-    //uint256 hashProofOfStake{};
+    uint256 hashProofOfStake{};
 
     bool IsProofOfWork() const
     {
@@ -448,11 +446,9 @@ public:
         if (obj.IsTreasuryBlock()) {
             READWRITE(obj.nTreasuryPayment);
         }
-        /*if (obj.IsProofOfStake()) {
-            READWRITE(obj.prevoutStake);
-            READWRITE(obj.nStakeTime);
+        if (obj.IsProofOfStake()) {
             READWRITE(obj.hashProofOfStake);
-        }*/
+        }
 
         // block header
         READWRITE(obj.nVersion);

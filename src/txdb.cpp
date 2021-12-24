@@ -280,9 +280,7 @@ bool CBlockTreeDB::LoadBlockIndexGuts(const Consensus::Params& consensusParams, 
                 pindexNew->nStakeModifier = diskindex.nStakeModifier;
                 pindexNew->nStakeModifierV2 = diskindex.nStakeModifierV2;
                 pindexNew->nTreasuryPayment = diskindex.nTreasuryPayment;
-                //pindexNew->prevoutStake   = diskindex.prevoutStake;
-                //pindexNew->nStakeTime     = diskindex.nStakeTime;
-                //pindexNew->hashProofOfStake = diskindex.hashProofOfStake;
+                pindexNew->hashProofOfStake = diskindex.hashProofOfStake;
 
                 const int algo = CBlockHeader::GetAlgoType(pindexNew->nVersion);
                 if (pindexNew->IsProofOfWork() && !CheckProofOfWork(pindexNew->GetBlockHeader().GetPoWHash(), pindexNew->nBits, algo, consensusParams))
