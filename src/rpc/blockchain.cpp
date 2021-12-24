@@ -191,6 +191,7 @@ UniValue blockToJSON(const CBlock& block, const CBlockIndex* tip, const CBlockIn
     result.pushKV("type", CBlockHeader::GetAlgoType(blockindex->nVersion) == -1 ? blockindex->IsProofOfWork() : CBlockHeader::GetAlgoType(blockindex->nVersion));
     result.pushKV("modifier", strprintf("%016x", blockindex->nStakeModifier));
     result.pushKV("modifierV2", blockindex->nStakeModifierV2.GetHex());
+    result.pushKV("modifierchecksum", strprintf("%08x", blockindex->nStakeModifierChecksum));
     result.pushKV("mint", ValueFromAmount(blockindex->nMint));
     result.pushKV("moneysupply", ValueFromAmount(blockindex->nMoneySupply));
     result.pushKV("treasurypayment", ValueFromAmount(blockindex->nTreasuryPayment));
@@ -232,7 +233,7 @@ UniValue blockToJSON(const CBlock& block, const CBlockIndex* tip, const CBlockIn
 
                     stakeData.pushKV("blockfromhash", hashBlock.GetHex());
                     stakeData.pushKV("blockfromheight", nHeightBlockFrom);
-                    stakeData.pushKV("stakemodifierheight", nStakeModifierHeight);
+                    stakeData.pushKV("modifierheight", nStakeModifierHeight);
                 }
             }
         }
