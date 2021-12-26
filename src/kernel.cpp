@@ -58,7 +58,7 @@ static int64_t GetStakeModifierSelectionIntervalSection(int nSection)
 static int64_t GetStakeModifierSelectionInterval()
 {
     int64_t nSelectionInterval = 0;
-    for (int nSection=0; nSection<64; nSection++)
+    for (int nSection = 0; nSection < 64; nSection++)
         nSelectionInterval += GetStakeModifierSelectionIntervalSection(nSection);
     return nSelectionInterval;
 }
@@ -187,23 +187,25 @@ bool ComputeNextStakeModifier(const CBlockIndex* pindexCurrent, uint64_t &nStake
     int nHeightFirstCandidate = pindex ? (pindex->nHeight + 1) : 0;
 
     // Shuffle before sort
-    for(int i = vSortedByTimestamp.size() - 1; i > 1; --i)
-    std::swap(vSortedByTimestamp[i], vSortedByTimestamp[GetRand(i)]);
+    for (int i = vSortedByTimestamp.size() - 1; i > 1; --i) {
+        std::swap(vSortedByTimestamp[i], vSortedByTimestamp[GetRand(i)]);
+    }
 
-    sort(vSortedByTimestamp.begin(), vSortedByTimestamp.end(), [] (const std::pair<int64_t, uint256> &a, const std::pair<int64_t, uint256> &b)
+    std::sort(vSortedByTimestamp.begin(), vSortedByTimestamp.end(), [] (const std::pair<int64_t, uint256> &a, const std::pair<int64_t, uint256> &b)
     {
         if (a.first != b.first)
             return a.first < b.first;
         // Timestamp equals - compare block hashes
-        const uint32_t *pa = a.second.GetDataPtr();
-        const uint32_t *pb = b.second.GetDataPtr();
+        const uint32_t *pa = (const uint32_t*)a.second.data();
+        const uint32_t *pb = (const uint32_t*)b.second.data();
         int cnt = 256 / 32;
         do {
             --cnt;
-            if (pa[cnt] != pb[cnt])
+            if (pa[cnt] != pb[cnt]) {
                 return pa[cnt] < pb[cnt];
-        } while(cnt);
-            return false; // Elements are equal
+            }
+        } while (cnt);
+        return false; // Elements are equal
     });
 
     // Select 64 blocks from candidate blocks to generate stake modifier
@@ -371,7 +373,7 @@ static inline bool GetKernelStakeModifierV03(const CBlockIndex* pindexPrev, uint
     int32_t nDepth = pindexPrev->nHeight - (pindexFrom->nHeight-1); // -1 is used to also include pindexFrom
     tmpChain.reserve(nDepth);
     const CBlockIndex* it = pindexPrev;
-    for (int i=1; i<=nDepth && !::ChainActive().Contains(it); i++) {
+    for (int i = 1; i <= nDepth && !::ChainActive().Contains(it); i++) {
         tmpChain.push_back(it);
         it = it->pprev;
     }
@@ -568,7 +570,7 @@ bool CheckStakeKernelHash(const unsigned int& nBits, const CBlockIndex* pindexPr
     const int nHeightStart = nHeightCurrent - 1;
     const int iteration = params.nStakeTimestampMask + 1; // 16 second time slots for 0xf masked time
     assert((nHashDrift & params.nStakeTimestampMask) == 0);
-    for (int i = nHashDrift; i >= 0; i-=iteration) //iterate the hashing
+    for (int i = nHashDrift; i >= 0; i -= iteration) //iterate the hashing
     {
         // New block came in, move on
         if (::ChainActive().Height() != nHeightStart)
@@ -725,7 +727,7 @@ unsigned int GetStakeEntropyBit(const CBlock& block)
         uint160 hashSig = Hash160(block.vchBlockSig);
         if (gArgs.GetBoolArg("-printstakemodifier", false))
             LogPrintf("GetStakeEntropyBit(v0.3): nTime=%u hashSig=%s", block.nTime, hashSig.ToString());
-        nEntropyBit = hashSig.GetDataPtr()[4] >> 31; // take the first bit of the hash
+        nEntropyBit = hashSig.data()[19] >> 7; // take the first bit of the hash
         if (gArgs.GetBoolArg("-printstakemodifier", false))
             LogPrintf(" entropybit=%d\n", nEntropyBit);
     }
