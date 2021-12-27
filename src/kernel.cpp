@@ -685,14 +685,14 @@ unsigned int GetStakeModifierChecksum(const CBlockIndex* pindex)
 // Check stake modifier hard checkpoints
 bool CheckStakeModifierCheckpoints(int nHeight, unsigned int nStakeModifierChecksum)
 {
-    bool fTestNet = Params().NetworkIDString() == CBaseChainParams::TESTNET;
-    if (fTestNet && mapStakeModifierTestnetCheckpoints.count(nHeight))
-        return nStakeModifierChecksum == mapStakeModifierTestnetCheckpoints[nHeight];
-
-    if (!fTestNet && mapStakeModifierCheckpoints.count(nHeight))
+    // Only check modifier checkpoints on mainnet and testnet
+    if (Params().NetworkIDString() == CBaseChainParams::MAIN && mapStakeModifierCheckpoints.count(nHeight)) {
         return nStakeModifierChecksum == mapStakeModifierCheckpoints[nHeight];
-
-    return true;
+    } else if (Params().NetworkIDString() == CBaseChainParams::TESTNET && mapStakeModifierTestnetCheckpoints.count(nHeight)) {
+        return nStakeModifierChecksum == mapStakeModifierTestnetCheckpoints[nHeight];
+    } else {
+        return true;
+    }
 }
 
 bool IsSuperMajority(unsigned int minVersion, const CBlockIndex* pstart, unsigned int nRequired, unsigned int nToCheck)
