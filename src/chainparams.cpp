@@ -262,8 +262,8 @@ public:
         consensus.mTreasuryPayees.emplace(CScript() << OP_0 << ParseHex("978a5064cd1fdf8c2510fe3fcbd65eaa5e98b32d"), 100); // 10% (full reward) for ep1qj799qexdrl0ccfgslcluh4j74f0f3vedatcv0k
         consensus.nTreasuryRewardPercentage = 10; // 10% of block reward goes to treasury
 
-        consensus.nMinimumChainWork = uint256S("0x0000000000000000000000000000000000000000000000000000000000000000");
-        consensus.defaultAssumeValid = uint256S("0x0000000000000000000000000000000000000000000000000000000000000000"); // 1864000
+        consensus.nMinimumChainWork = uint256S("0x0000000000000000000000000000000000000000000000000000030d440d4400");
+        consensus.defaultAssumeValid = uint256S("0x4a121e7765837b21bcffad979e499ecbf7184fcbf772c34c481433059d0840f8"); // 200000
 
         pchMessageStart[0] = 0xdb;
         pchMessageStart[1] = 0xb1;
@@ -316,15 +316,19 @@ public:
 
         checkpointData = {
             {
-                {0, uint256S("000000954c02f260a6db02c712557adcb5a7a8a0a9acfd3d3c2b3a427376c56f")},
+                { 0, uint256S("000000954c02f260a6db02c712557adcb5a7a8a0a9acfd3d3c2b3a427376c56f")},
+                { 50000, uint256S("80527921e815691fa6c036163b847019da3eef41469b64dc90de120b6cbf3a2f")},
+                { 100000, uint256S("db0ff8f8967068e6d8478f4994440d344c50014952ad751ada2fb565006a7aaa")},
+                { 150000, uint256S("ebc04d48a973267b21f3899e5c42b61c0c7ed519627078c6c3b6ef514cfffc52")},
+                { 200000, uint256S("4a121e7765837b21bcffad979e499ecbf7184fcbf772c34c481433059d0840f8")},
             }
         };
 
         chainTxData = ChainTxData{
-            // Data from RPC: getchaintxstats 4096 000000000000006433d1efec504c53ca332b64963c425395515b01977bd7b3b0
-            /* nTime    */ 0,
-            /* nTxCount */ 0,
-            /* dTxRate  */ 0,
+            // Data from RPC: getchaintxstats 30720 4a121e7765837b21bcffad979e499ecbf7184fcbf772c34c481433059d0840f8
+            /* nTime    */ 1639755808,
+            /* nTxCount */ 395244,
+            /* dTxRate  */ 0.0314994216903049,
         };
     }
 };
