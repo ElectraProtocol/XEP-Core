@@ -5826,6 +5826,14 @@ bool CheckBlockSignature(const CBlock& block)
             if ((pubkeyStart + CPubKey::COMPRESSED_SIZE) > txin.scriptSig.size() || txin.scriptSig[pubkeyStart-1] < CPubKey::COMPRESSED_SIZE) // last pushdata must be large enough to at least hold a compressed pubkey
                 return error("%s : p2pkh txin.scriptSig.size() = %u is too small", __func__, txin.scriptSig.size());
             pubkey = CPubKey(txin.scriptSig.begin()+pubkeyStart, txin.scriptSig.end());
+        } else if ((fProofOfStake && block.vtx[1]->vout.size() > 2) || (!fProofOfStake && block.vtx[0]->vout.size() > 1)) { // check for pubkey in OP_RETURN output - this can be any arbitrary pubkey as it will be covered by the coinstake TX signature hash
+            for (const CTxOut& out : block.vtx[fProofOfStake]->vout) {
+                if (out.scriptPubKey.size() == 35 && out.scriptPubKey[0] == OP_RETURN && out.scriptPubKey[1] == CPubKey::COMPRESSED_SIZE) { // output of CScript() << OP_RETURN << ToByteVector(signingPubKey)
+                    //LogPrintf("%s : OP_RETURN out.scriptPubKey = %s\n", __func__, HexStr(out.scriptPubKey));
+                    //LogPrintf("%s : out.scriptPubKey.size() = %u\n", __func__, out.scriptPubKey.size());
+                    pubkey = CPubKey(out.scriptPubKey.begin()+2, out.scriptPubKey.end()); // skip OP_RETURN and pushdata length byte
+                }
+            }
         } else if (cbtxin.scriptSig.size() > CPubKey::COMPRESSED_SIZE && cbtxin.scriptSig[cbtxin.scriptSig.size()-CPubKey::COMPRESSED_SIZE-1] == CPubKey::COMPRESSED_SIZE) { // check for pubkey in coinbase
             //std::vector<unsigned char> vchPubKey(cbtxin.scriptSig.end()-CPubKey::COMPRESSED_SIZE, cbtxin.scriptSig.end());
             //LogPrintf("%s : coinbase cbtxin.scriptSig = %s\n", __func__, HexStr(cbtxin.scriptSig));
@@ -5841,14 +5849,6 @@ bool CheckBlockSignature(const CBlock& block)
                 }
             } else
                 return error("%s : unable to verify pubkey belongs to first output of type=%s", __func__, GetTxnOutputType(whichType));
-        } else if ((fProofOfStake && block.vtx[1]->vout.size() > 2) || (!fProofOfStake && block.vtx[0]->vout.size() > 1)) { // check for pubkey in OP_RETURN output - this can be any arbitrary pubkey as it will be covered by the coinstake TX signature hash
-            for (const CTxOut& out : block.vtx[fProofOfStake]->vout) {
-                if (out.scriptPubKey.size() == 35 && out.scriptPubKey[0] == OP_RETURN && out.scriptPubKey[1] == CPubKey::COMPRESSED_SIZE) { // output of CScript() << OP_RETURN << ToByteVector(signingPubKey)
-                    //LogPrintf("%s : OP_RETURN out.scriptPubKey = %s\n", __func__, HexStr(out.scriptPubKey));
-                    //LogPrintf("%s : out.scriptPubKey.size() = %u\n", __func__, out.scriptPubKey.size());
-                    pubkey = CPubKey(out.scriptPubKey.begin()+2, out.scriptPubKey.end()); // skip OP_RETURN and pushdata length byte
-                }
-            }
         } else { // we don't know where the pubkey is or how to parse it
             return error("%s : unable to find pubkey to validate block signature", __func__);
         }
