@@ -18,7 +18,7 @@
 #include <validation.h>
 
 // Hard checkpoints of stake modifiers to ensure they are deterministic
-static std::map<int, unsigned int> mapStakeModifierCheckpoints = {
+static const std::map<int, unsigned int> mapStakeModifierCheckpoints = {
     { 0, 0x0e00670bu },
     { 50000, 0xcbe5a9b4u },
     { 100000, 0xbd074053u },
@@ -29,7 +29,7 @@ static std::map<int, unsigned int> mapStakeModifierCheckpoints = {
     { 350000, 0x4d95e3f4u },
 };
 
-static std::map<int, unsigned int> mapStakeModifierTestnetCheckpoints = {
+static const std::map<int, unsigned int> mapStakeModifierTestnetCheckpoints = {
     { 0, 0x0e00670bu },
     { 50000, 0x4af2e306u },
     { 100000, 0xd9e06043u },
@@ -691,9 +691,9 @@ bool CheckStakeModifierCheckpoints(int nHeight, unsigned int nStakeModifierCheck
 {
     // Only check modifier checkpoints on mainnet and testnet
     if (Params().NetworkIDString() == CBaseChainParams::MAIN && mapStakeModifierCheckpoints.count(nHeight)) {
-        return nStakeModifierChecksum == mapStakeModifierCheckpoints[nHeight];
+        return nStakeModifierChecksum == mapStakeModifierCheckpoints.at(nHeight);
     } else if (Params().NetworkIDString() == CBaseChainParams::TESTNET && mapStakeModifierTestnetCheckpoints.count(nHeight)) {
-        return nStakeModifierChecksum == mapStakeModifierTestnetCheckpoints[nHeight];
+        return nStakeModifierChecksum == mapStakeModifierTestnetCheckpoints.at(nHeight);
     } else {
         return true;
     }
