@@ -401,16 +401,16 @@ void XEPGUI::createActions()
     connect(quitAction, &QAction::triggered, rpcConsole, &QWidget::hide);
     connect(quitAction, &QAction::triggered, appLocker, &QWidget::close);
 
-    websiteLinkAction = new QAction(tr("Website"), this);
+    websiteLinkAction = new QAction(tr("Electra Protocol Website"), this);
     websiteLinkAction->setStatusTip("https://www.electraprotocol.com/");
 
     githubLinkAction = new QAction(tr("GitHub"), this);
     githubLinkAction->setStatusTip("https://github.com/ElectraProtocol/XEP-Core");
 
-    explorerOneAction = new QAction(tr("Explorer 1"), this);
+    explorerOneAction = new QAction(tr("New explorer"), this);
     explorerOneAction->setStatusTip("https://explorer.electraprotocol.network/");
 
-    explorerTwoAction = new QAction(tr("Explorer 2"), this);
+    explorerTwoAction = new QAction(tr("Legacy explorer"), this);
     explorerTwoAction->setStatusTip("https://electraprotocol.network/");
 
     cmcLinkAction = new QAction(tr("CoinMarketCap"), this);
