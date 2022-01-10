@@ -27,6 +27,7 @@ static const std::map<int, unsigned int> mapStakeModifierCheckpoints = {
     { 250000, 0x2c20452eu },
     { 300000, 0x9bb2d8e3u },
     { 350000, 0x4d95e3f4u },
+    { 400000, 0x13ac8c66u },
 };
 
 static const std::map<int, unsigned int> mapStakeModifierTestnetCheckpoints = {
