@@ -1000,15 +1000,14 @@ void StopStakingThreads()
 {
     LOCK(cs_thread_containers);
 
-    // Stop all staking threads
-    while (!staking_thread_interrupters.empty()) {
+    // Stop all staking threads and join them until they have fully exited
+    while (!staking_threads.empty() && !staking_thread_interrupters.empty()) {
         staking_thread_interrupters.front()();
-        staking_thread_interrupters.pop_front();
-    }
-    // Join the staking threads until they have fully exited
-    while (!staking_threads.empty()) {
         staking_threads.front().second.join();
+
+        // Remove staking thread before interrupter because it uses a pointer to the interrupter
         staking_threads.pop_front();
+        staking_thread_interrupters.pop_front();
     }
     // Clear any UI warnings about staking status
     ClearMintWarning();
