@@ -41,7 +41,7 @@
 #include <mutex>
 
 static Mutex cs_thread_containers;
-static std::vector<std::thread> staking_threads GUARDED_BY(cs_thread_containers);
+static std::forward_list<std::pair<unsigned int, std::thread>> staking_threads GUARDED_BY(cs_thread_containers);
 static std::forward_list<CThreadInterrupt> staking_thread_interrupters GUARDED_BY(cs_thread_containers);
 #endif // ENABLE_WALLET
 int64_t nLastCoinStakeSearchInterval = 0;
@@ -938,30 +938,63 @@ static void ThreadStakeMinter(const std::shared_ptr<CWallet>& pwallet, const uns
 }
 
 // peercoin: stake minter
-void CreateStakingThread(const std::shared_ptr<CWallet>& pwallet, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool)
+unsigned int CreateStakingThread(const std::shared_ptr<CWallet>& pwallet, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool)
 {
     LOCK(cs_thread_containers);
 
-    static unsigned int threadNum{1};
+    static unsigned int threadNum{0};
+    threadNum++;
 
     // peercoin: mint proof-of-stake blocks in the background
     staking_thread_interrupters.emplace_front();
-    staking_threads.emplace_back(std::bind(&ThreadStakeMinter, pwallet, threadNum, &staking_thread_interrupters.front(), chainman, connman, mempool));
-    threadNum++;
+    staking_threads.emplace_front(threadNum, std::thread(std::bind(&ThreadStakeMinter, pwallet, threadNum, &staking_thread_interrupters.front(), chainman, connman, mempool)));
+
+    return threadNum;
 }
 
-/*
-// TODO: allow interruption of individual staking threads
 void StopStakingThread(const unsigned int threadNum)
 {
     LOCK(cs_thread_containers);
 
-    if (threadNum <= staking_threads.size()) {
-        interrupter();
-        staking_threads[threadNum - 1].join();
+    std::forward_list<std::pair<unsigned int, std::thread>>::iterator threadsIterator = staking_threads.begin();
+    std::forward_list<CThreadInterrupt>::iterator interruptersIterator = staking_thread_interrupters.begin();
+
+    std::forward_list<std::pair<unsigned int, std::thread>>::iterator threadsIteratorPrev = staking_threads.end();
+    std::forward_list<CThreadInterrupt>::iterator interruptersIteratorPrev = staking_thread_interrupters.end();
+
+    bool found = false;
+    while (threadsIterator != staking_threads.end() && interruptersIterator != staking_thread_interrupters.end()) {
+        if ((*threadsIterator).first == threadNum) {
+            found = true;
+            break;
+        }
+
+        threadsIteratorPrev = threadsIterator;
+        interruptersIteratorPrev = interruptersIterator;
+
+        threadsIterator++;
+        interruptersIterator++;
+    }
+
+    if (found) {
+        // Stop thread
+        (*interruptersIterator)();
+        (*threadsIterator).second.join();
+
+        // Remove thread objects from the lists
+        if (threadsIteratorPrev != staking_threads.end() && interruptersIteratorPrev != staking_thread_interrupters.end()) {
+            staking_threads.erase_after(threadsIteratorPrev);
+            staking_thread_interrupters.erase_after(interruptersIteratorPrev);
+        } else { // Only one staking thread running
+            staking_threads.clear();
+            staking_thread_interrupters.clear();
+        }
+
+        // Clear any UI warnings about staking status
+        ClearMintWarning();
+        uiInterface.NotifyAlertChanged();
     }
 }
-*/
 
 void StopStakingThreads()
 {
@@ -974,8 +1007,8 @@ void StopStakingThreads()
     }
     // Join the staking threads until they have fully exited
     while (!staking_threads.empty()) {
-        staking_threads.back().join();
-        staking_threads.pop_back();
+        staking_threads.front().second.join();
+        staking_threads.pop_front();
     }
     // Clear any UI warnings about staking status
     ClearMintWarning();
