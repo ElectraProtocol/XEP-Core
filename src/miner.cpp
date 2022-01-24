@@ -1,5 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2020 The Bitcoin Core developers
+// Copyright (c) 2021-2022 John "ComputerCraftr" Studnicka
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -33,7 +34,7 @@
 #include <warnings.h>
 
 #include <algorithm>
-#include <forward_list>
+#include <list>
 #include <thread>
 #include <utility>
 
@@ -41,8 +42,8 @@
 #include <mutex>
 
 static Mutex cs_thread_containers;
-static std::forward_list<std::pair<unsigned int, std::thread>> staking_threads GUARDED_BY(cs_thread_containers);
-static std::forward_list<CThreadInterrupt> staking_thread_interrupters GUARDED_BY(cs_thread_containers);
+static std::list<std::pair<unsigned int, std::thread>> staking_threads GUARDED_BY(cs_thread_containers);
+static std::list<CThreadInterrupt> staking_thread_interrupters GUARDED_BY(cs_thread_containers);
 #endif // ENABLE_WALLET
 int64_t nLastCoinStakeSearchInterval = 0;
 
@@ -956,11 +957,8 @@ void StopStakingThread(const unsigned int threadNum)
 {
     LOCK(cs_thread_containers);
 
-    std::forward_list<std::pair<unsigned int, std::thread>>::iterator threadsIterator = staking_threads.begin();
-    std::forward_list<CThreadInterrupt>::iterator interruptersIterator = staking_thread_interrupters.begin();
-
-    std::forward_list<std::pair<unsigned int, std::thread>>::iterator threadsIteratorPrev = staking_threads.end();
-    std::forward_list<CThreadInterrupt>::iterator interruptersIteratorPrev = staking_thread_interrupters.end();
+    std::list<std::pair<unsigned int, std::thread>>::iterator threadsIterator = staking_threads.begin();
+    std::list<CThreadInterrupt>::iterator interruptersIterator = staking_thread_interrupters.begin();
 
     bool found = false;
     while (threadsIterator != staking_threads.end() && interruptersIterator != staking_thread_interrupters.end()) {
@@ -968,9 +966,6 @@ void StopStakingThread(const unsigned int threadNum)
             found = true;
             break;
         }
-
-        threadsIteratorPrev = threadsIterator;
-        interruptersIteratorPrev = interruptersIterator;
 
         threadsIterator++;
         interruptersIterator++;
@@ -982,13 +977,8 @@ void StopStakingThread(const unsigned int threadNum)
         (*threadsIterator).second.join();
 
         // Remove thread objects from the lists
-        if (threadsIteratorPrev != staking_threads.end() && interruptersIteratorPrev != staking_thread_interrupters.end()) {
-            staking_threads.erase_after(threadsIteratorPrev);
-            staking_thread_interrupters.erase_after(interruptersIteratorPrev);
-        } else { // Only one staking thread running
-            staking_threads.clear();
-            staking_thread_interrupters.clear();
-        }
+        staking_threads.erase(threadsIterator);
+        staking_thread_interrupters.erase(interruptersIterator);
 
         // Clear any UI warnings about staking status
         ClearMintWarning();
@@ -1009,6 +999,7 @@ void StopStakingThreads()
         staking_threads.pop_front();
         staking_thread_interrupters.pop_front();
     }
+
     // Clear any UI warnings about staking status
     ClearMintWarning();
     uiInterface.NotifyAlertChanged();
