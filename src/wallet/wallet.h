@@ -647,6 +647,8 @@ private:
 
     std::atomic<bool> fUnlockedAskingForPassword{false};
 
+    std::atomic<uint32_t> nStakingThread{0};
+
     //! the current wallet version: clients below this version are not able to load the wallet
     int nWalletVersion GUARDED_BY(cs_wallet){FEATURE_BASE};
 
@@ -787,6 +789,14 @@ public:
     bool IsUnlockedAskingForPassword() const { return fUnlockedAskingForPassword; }
     bool Lock(bool fAskingForPassword = false);
     void SetUnlockedAskingForPassword(bool value) { fUnlockedAskingForPassword = value; }
+
+    uint32_t GetStakingThread() const { return nStakingThread; }
+    void SetStakingThread(const uint32_t threadNum)
+    {
+        if (nStakingThread == 0) {
+            nStakingThread = threadNum;
+        }
+    }
 
     /** Interface to assert chain access */
     bool HaveChain() const { return m_chain ? true : false; }

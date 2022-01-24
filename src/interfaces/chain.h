@@ -287,6 +287,9 @@ public:
     virtual void requestMempoolTransactions(Notifications& notifications) = 0;
 
 #ifdef ENABLE_WALLET
+    //! Stop staking thread.
+    virtual void stopStakingThread(const uint32_t threadNum) = 0;
+
     //! Stop staking threads.
     virtual void stopStakingThreads() = 0;
 #endif // ENABLE_WALLET

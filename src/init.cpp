@@ -2039,8 +2039,9 @@ bool AppInitMain(const util::Ref& context, NodeContext& node, interfaces::BlockA
 #ifdef ENABLE_WALLET
     std::vector<std::shared_ptr<CWallet>> wallets = GetWallets();
     for (unsigned int i = 0; i < wallets.size(); i++) {
-        if (wallets[i])
-            CreateStakingThread(wallets[i], node.chainman, node.connman.get(), node.mempool.get());
+        if (wallets[i]) {
+            wallets[i]->SetStakingThread(CreateStakingThread(wallets[i], node.chainman, node.connman.get(), node.mempool.get()));
+        }
     }
 #endif // ENABLE_WALLET
 

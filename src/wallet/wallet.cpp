@@ -112,7 +112,7 @@ bool RemoveWallet(const std::shared_ptr<CWallet>& wallet, Optional<bool> load_on
     std::string name = wallet->GetName();
 
     // Stop wallet staking thread
-    chain.stopStakingThreads();
+    chain.stopStakingThread(wallet->GetStakingThread());
 
     // Unregister with the validation interface which also drops shared ponters.
     wallet->m_chain_notifications_handler.reset();

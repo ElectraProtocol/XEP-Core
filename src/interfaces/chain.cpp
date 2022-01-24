@@ -410,6 +410,10 @@ public:
         }
     }
 #ifdef ENABLE_WALLET
+    void stopStakingThread(const uint32_t threadNum) override
+    {
+        StopStakingThread(threadNum);
+    }
     void stopStakingThreads() override
     {
         StopStakingThreads();
