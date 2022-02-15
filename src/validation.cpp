@@ -2301,12 +2301,13 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
     // post BIP34 before approximately height 486,000,000 and presumably will
     // be reset before it reaches block 1,983,702 and starts doing unnecessary
     // BIP30 checking again.
-    CBlockIndex *pindexBIP34height = nullptr;
+    CBlockIndex* pindexBIP34height = nullptr;
     if (pindex->GetBlockHash() != chainparams.GetConsensus().hashGenesisBlock) {
         assert(pindex->pprev);
         pindexBIP34height = pindex->pprev->GetAncestor(chainparams.GetConsensus().BIP34Height);
-    } else
+    } else {
         fEnforceBIP30 = false;
+    }
     //Only continue to enforce if we're below BIP34 activation height or the block hash at that height doesn't correspond.
     fEnforceBIP30 = fEnforceBIP30 && (!pindexBIP34height || !(pindexBIP34height->GetBlockHash() == chainparams.GetConsensus().BIP34Hash));
 
