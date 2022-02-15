@@ -173,6 +173,7 @@ public:
         vSeeds.emplace_back("seed06.electraprotocol.eu");
         vSeeds.emplace_back("seed07.electraprotocol.eu");
         vSeeds.emplace_back("seed08.electraprotocol.eu");
+        vSeeds.emplace_back("xep.zentec.network");
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,55);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,137);
@@ -299,6 +300,7 @@ public:
         vSeeds.emplace_back("seed06.electraprotocol.eu");
         vSeeds.emplace_back("seed07.electraprotocol.eu");
         vSeeds.emplace_back("seed08.electraprotocol.eu");
+        vSeeds.emplace_back("xep.zentec.network");
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,141);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,19);
@@ -353,7 +355,7 @@ public:
             vSeeds.emplace_back("seed06.electraprotocol.eu");
             vSeeds.emplace_back("seed07.electraprotocol.eu");
             vSeeds.emplace_back("seed08.electraprotocol.eu");
-            //vSeeds.emplace_back("v7ajjeirttkbnt32wpy3c6w3emwnfr3fkla7hpxcfokr3ysd3kqtzmqd.onion:38333");
+            vSeeds.emplace_back("xep.zentec.network");
 
             consensus.nMinimumChainWork = uint256S("0x0000000000000000000000000000000000000000000000000000000000000000");
             consensus.defaultAssumeValid = uint256S("0x0000000000000000000000000000000000000000000000000000000000000000"); // 9434
