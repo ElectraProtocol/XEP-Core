@@ -1,8 +1,9 @@
 // Copyright (c) 2012-2020 The Peercoin developers
 // Copyright (c) 2015-2019 The PIVX developers
-// Copyright (c) 2018-2020 John "ComputerCraftr" Studnicka
+// Copyright (c) 2018-2021 John "ComputerCraftr" Studnicka
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #ifndef PEERCOIN_KERNEL_H
 #define PEERCOIN_KERNEL_H
 
@@ -40,7 +41,7 @@ bool CheckProofOfStake(BlockValidationState& state, const CCoinsViewCache& view,
 bool CheckCoinStakeTimestamp(int64_t nTimeBlock, int64_t nTimeTx);
 
 // Get stake modifier checksum
-//unsigned int GetStakeModifierChecksum(const CBlockIndex* pindex);
+unsigned int GetStakeModifierChecksum(const CBlockIndex* pindex);
 
 // Check stake modifier hard checkpoints
 bool CheckStakeModifierCheckpoints(int nHeight, unsigned int nStakeModifierChecksum);

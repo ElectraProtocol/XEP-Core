@@ -216,6 +216,7 @@ RES_ICONS = \
   qt/res/icons/warning.png
 
 BITCOIN_QT_BASE_CPP = \
+  qt/applocker.cpp \
   qt/bantablemodel.cpp \
   qt/xep.cpp \
   qt/xepaddressvalidator.cpp \
@@ -245,7 +246,6 @@ BITCOIN_QT_WINDOWS_CPP = qt/winshutdownmonitor.cpp
 BITCOIN_QT_WALLET_CPP = \
   qt/addressbookpage.cpp \
   qt/addresstablemodel.cpp \
-  qt/applocker.cpp \
   qt/askpassphrasedialog.cpp \
   qt/coincontroldialog.cpp \
   qt/coincontroltreewidget.cpp \

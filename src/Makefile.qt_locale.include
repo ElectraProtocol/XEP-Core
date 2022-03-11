@@ -2,6 +2,7 @@ QT_TS = \
   qt/locale/xep_af.ts \
   qt/locale/xep_am.ts \
   qt/locale/xep_ar.ts \
+  qt/locale/xep_az.ts \
   qt/locale/xep_be.ts \
   qt/locale/xep_bg.ts \
   qt/locale/xep_bn.ts \
@@ -27,7 +28,10 @@ QT_TS = \
   qt/locale/xep_fi.ts \
   qt/locale/xep_fil.ts \
   qt/locale/xep_fr.ts \
+  qt/locale/xep_ga.ts \
+  qt/locale/xep_gl.ts \
   qt/locale/xep_gl_ES.ts \
+  qt/locale/xep_gu.ts \
   qt/locale/xep_he.ts \
   qt/locale/xep_hi.ts \
   qt/locale/xep_hr.ts \
@@ -38,6 +42,7 @@ QT_TS = \
   qt/locale/xep_ja.ts \
   qt/locale/xep_ka.ts \
   qt/locale/xep_kk.ts \
+  qt/locale/xep_kl.ts \
   qt/locale/xep_km.ts \
   qt/locale/xep_ko.ts \
   qt/locale/xep_ku_IQ.ts \
@@ -49,10 +54,12 @@ QT_TS = \
   qt/locale/xep_ml.ts \
   qt/locale/xep_mn.ts \
   qt/locale/xep_mr_IN.ts \
+  qt/locale/xep_ms.ts \
   qt/locale/xep_my.ts \
   qt/locale/xep_nb.ts \
   qt/locale/xep_ne.ts \
   qt/locale/xep_nl.ts \
+  qt/locale/xep_no.ts \
   qt/locale/xep_pam.ts \
   qt/locale/xep_pl.ts \
   qt/locale/xep_pt.ts \
@@ -72,6 +79,7 @@ QT_TS = \
   qt/locale/xep_te.ts \
   qt/locale/xep_th.ts \
   qt/locale/xep_tr.ts \
+  qt/locale/xep_ug.ts \
   qt/locale/xep_uk.ts \
   qt/locale/xep_ur.ts \
   qt/locale/xep_uz@Cyrl.ts \

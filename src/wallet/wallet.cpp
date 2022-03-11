@@ -111,6 +111,9 @@ bool RemoveWallet(const std::shared_ptr<CWallet>& wallet, Optional<bool> load_on
     interfaces::Chain& chain = wallet->chain();
     std::string name = wallet->GetName();
 
+    // Stop wallet staking thread
+    chain.stopStakingThread(wallet->GetStakingThread());
+
     // Unregister with the validation interface which also drops shared ponters.
     wallet->m_chain_notifications_handler.reset();
     LOCK(cs_wallets);
@@ -2154,6 +2157,24 @@ void MaybeResendWalletTxs()
     }
 }
 
+void AbandonOrphanedCoinStakes()
+{
+    for (const std::shared_ptr<CWallet>& pwallet : GetWallets()) {
+        TRY_LOCK(pwallet->cs_wallet, locked_wallet);
+
+        if (locked_wallet) {
+            for (const std::pair<const uint256, CWalletTx>& item : pwallet->mapWallet) {
+                const CWalletTx& wtx = item.second;
+                if (wtx.isUnconfirmed() && (wtx.IsCoinBase() || wtx.IsCoinStake())) {
+                    const uint256& wtxid = item.first;
+                    pwallet->WalletLogPrintf("Abandoning orphaned coinbase/coinstake %s\n", wtxid.ToString());
+                    pwallet->AbandonTransaction(wtxid);
+                }
+            }
+        }
+    }
+}
+
 
 /** @defgroup Actions
  *
@@ -3387,6 +3408,28 @@ bool CWallet::GetNewChangeDestination(const OutputType type, CTxDestination& des
 
     reservedest.KeepDestination();
     return true;
+}
+
+bool CWallet::GetNewStakingDestination(CTxDestination& dest, std::string& error)
+{
+    LOCK(cs_wallet);
+    error.clear();
+
+    // Since the BIP32 key derivation also uses ECDSA to generate parent keys, exposing the extended public keys
+    // would allow an early quantum computer which can derive a private key from an ECDSA public key in a matter
+    // of months or weeks to also derive the private keys for all child addresses simultaneously and render any
+    // potential protection provided by using pubkey hash addresses immaterial, regardless of whether hardened or
+    // non-hardened child key derivation is used.
+    // See https://bitcointalk.org/index.php?topic=1652854.msg16608144#msg16608144
+    auto spk_man = GetScriptPubKeyMan(OutputType::BECH32, false /* internal */);
+    if (spk_man) {
+        // Don't spam the address book with single use staking addresses
+        spk_man->TopUp();
+        return spk_man->GetNewDestination(OutputType::BECH32, dest, error);
+    } else {
+        error = strprintf("Error: No %s addresses available.", FormatOutputType(OutputType::BECH32));
+        return false;
+    }
 }
 
 int64_t CWallet::GetOldestKeyPoolTime() const

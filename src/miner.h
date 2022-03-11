@@ -1,5 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2020 The Bitcoin Core developers
+// Copyright (c) 2021-2022 John "ComputerCraftr" Studnicka
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -173,7 +174,7 @@ public:
     explicit BlockAssembler(const CTxMemPool& mempool, const CChainParams& params, const Options& options);
 
     /** Construct a new block template with coinbase to scriptPubKeyIn */
-    std::unique_ptr<CBlockTemplate> CreateNewBlock(const CScript& scriptPubKeyIn, std::shared_ptr<CWallet> pwallet=nullptr, bool* pfPoSCancel=nullptr);
+    std::unique_ptr<CBlockTemplate> CreateNewBlock(const CScript& scriptPubKeyIn, const std::shared_ptr<CWallet>& pwallet=nullptr, bool* pfPoSCancel=nullptr);
 
     static Optional<int64_t> m_last_block_num_txs;
     static Optional<int64_t> m_last_block_weight;
@@ -219,11 +220,11 @@ int64_t UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParam
 /** Update an old GenerateCoinbaseCommitment from CreateNewBlock after the block txs have changed */
 void RegenerateCommitments(CBlock& block);
 
-namespace boost {
-    class thread_group;
-} // namespace boost
-
-bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, std::shared_ptr<CWallet> pwallet, const CAmount& nFees, const int& nHeight, const CBlockIndex* pindexPrev, const Consensus::Params& consensusParams);
-void MintStake(boost::thread_group& threadGroup, std::shared_ptr<CWallet> pwallet, const unsigned int walletNum, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool);
+#ifdef ENABLE_WALLET
+bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, const std::shared_ptr<CWallet>& pwallet, const CAmount& nFees, const int& nHeight, const CBlockIndex* pindexPrev, const Consensus::Params& consensusParams);
+unsigned int CreateStakingThread(const std::shared_ptr<CWallet>& pwallet, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool);
+void StopStakingThread(const unsigned int threadNum);
+void StopStakingThreads();
+#endif // ENABLE_WALLET
 
 #endif // BITCOIN_MINER_H

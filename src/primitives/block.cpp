@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2019 The Bitcoin Core developers
-// Copyright (c) 2018-2020 John "ComputerCraftr" Studnicka
+// Copyright (c) 2018-2021 John "ComputerCraftr" Studnicka
 // Copyright (c) 2018-2020 The Simplicity developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -29,7 +29,7 @@ std::string CBlock::ToString() const
         hashPrevBlock.ToString(),
         hashMerkleRoot.ToString(),
         nTime, nBits, nNonce,
-        GetAlgo(nVersion) == -1 ? IsProofOfWork() : GetAlgo(nVersion),
+        GetAlgoType(nVersion) == -1 ? IsProofOfWork() : GetAlgoType(nVersion),
         vtx.size(),
         vchBlockSig.size());
     for (const auto& tx : vtx) {

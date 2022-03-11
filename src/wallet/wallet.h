@@ -647,6 +647,8 @@ private:
 
     std::atomic<bool> fUnlockedAskingForPassword{false};
 
+    std::atomic<uint32_t> nStakingThread{0};
+
     //! the current wallet version: clients below this version are not able to load the wallet
     int nWalletVersion GUARDED_BY(cs_wallet){FEATURE_BASE};
 
@@ -787,6 +789,14 @@ public:
     bool IsUnlockedAskingForPassword() const { return fUnlockedAskingForPassword; }
     bool Lock(bool fAskingForPassword = false);
     void SetUnlockedAskingForPassword(bool value) { fUnlockedAskingForPassword = value; }
+
+    uint32_t GetStakingThread() const { return nStakingThread; }
+    void SetStakingThread(const uint32_t threadNum)
+    {
+        if (nStakingThread == 0) {
+            nStakingThread = threadNum;
+        }
+    }
 
     /** Interface to assert chain access */
     bool HaveChain() const { return m_chain ? true : false; }
@@ -1059,6 +1069,7 @@ public:
 
     bool GetNewDestination(const OutputType type, const std::string label, CTxDestination& dest, std::string& error);
     bool GetNewChangeDestination(const OutputType type, CTxDestination& dest, std::string& error);
+    bool GetNewStakingDestination(CTxDestination& dest, std::string& error);
 
     isminetype IsMine(const CTxDestination& dest) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     isminetype IsMine(const CScript& script) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
@@ -1301,6 +1312,9 @@ public:
  * their transactions. Actual rebroadcast schedule is managed by the wallets themselves.
  */
 void MaybeResendWalletTxs();
+
+// Called periodically to ensure that no unspendable orphaned coinstakes remain in any wallets
+void AbandonOrphanedCoinStakes();
 
 /** RAII object to check and reserve a wallet rescan */
 class WalletRescanReserver

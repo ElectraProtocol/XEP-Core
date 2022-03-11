@@ -260,6 +260,8 @@ bool CBlockTreeDB::LoadBlockIndexGuts(const Consensus::Params& consensusParams, 
                 CBlockIndex* pindexNew = insertBlockIndex(diskindex.GetBlockHash());
                 pindexNew->pprev          = insertBlockIndex(diskindex.hashPrev);
                 pindexNew->nHeight        = diskindex.nHeight;
+                pindexNew->nHeightPoW     = diskindex.nHeightPoW;
+                pindexNew->nHeightPoS     = diskindex.nHeightPoS;
                 pindexNew->nFile          = diskindex.nFile;
                 pindexNew->nDataPos       = diskindex.nDataPos;
                 pindexNew->nUndoPos       = diskindex.nUndoPos;
@@ -278,11 +280,9 @@ bool CBlockTreeDB::LoadBlockIndexGuts(const Consensus::Params& consensusParams, 
                 pindexNew->nStakeModifier = diskindex.nStakeModifier;
                 pindexNew->nStakeModifierV2 = diskindex.nStakeModifierV2;
                 pindexNew->nTreasuryPayment = diskindex.nTreasuryPayment;
-                //pindexNew->prevoutStake   = diskindex.prevoutStake;
-                //pindexNew->nStakeTime     = diskindex.nStakeTime;
-                //pindexNew->hashProofOfStake = diskindex.hashProofOfStake;
+                pindexNew->hashProofOfStake = diskindex.hashProofOfStake;
 
-                const int algo = CBlockHeader::GetAlgo(pindexNew->nVersion);
+                const int algo = CBlockHeader::GetAlgoType(pindexNew->nVersion);
                 if (pindexNew->IsProofOfWork() && !CheckProofOfWork(pindexNew->GetBlockHeader().GetPoWHash(), pindexNew->nBits, algo, consensusParams))
                     return error("%s: CheckProofOfWork failed: %s", __func__, pindexNew->ToString());
 

@@ -195,6 +195,8 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, 
         }
     }
 
+    // It is safe to skip the output value checks here because we ensure that a coinstake TX can only ever occur as
+    // the second TX of a PoS block in CheckBlock and the reward amount will be checked in CChainState::ConnectBlock
     if (!tx.IsCoinStake()) {
         const CAmount value_out = tx.GetValueOut();
         if (nValueIn < value_out) {

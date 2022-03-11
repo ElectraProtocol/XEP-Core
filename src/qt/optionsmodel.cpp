@@ -115,6 +115,11 @@ void OptionsModel::Init(bool resetSettings)
     if (!gArgs.SoftSetBoolArg("-spendzeroconfchange", settings.value("bSpendZeroConfChange").toBool()))
         addOverriddenOption("-spendzeroconfchange");
 
+    if (!settings.contains("bQuantumSafeStaking"))
+        settings.setValue("bQuantumSafeStaking", false);
+    if (!gArgs.SoftSetBoolArg("-quantumsafestaking", settings.value("bQuantumSafeStaking").toBool()))
+        addOverriddenOption("-quantumsafestaking");
+
     if (!settings.contains("nTargetStakeInputs"))
         settings.setValue("nTargetStakeInputs", int(0));
     if (!gArgs.SoftSetArg("-targetstakeinputs", settings.value("nTargetStakeInputs").toString().toStdString()))
@@ -309,6 +314,8 @@ QVariant OptionsModel::data(const QModelIndex & index, int role) const
 #ifdef ENABLE_WALLET
         case SpendZeroConfChange:
             return settings.value("bSpendZeroConfChange");
+        case QuantumSafeStaking:
+            return settings.value("bQuantumSafeStaking");
         case TargetStakeInputs:
             return settings.value("nTargetStakeInputs");
 #endif
@@ -423,6 +430,12 @@ bool OptionsModel::setData(const QModelIndex & index, const QVariant & value, in
         case SpendZeroConfChange:
             if (settings.value("bSpendZeroConfChange") != value) {
                 settings.setValue("bSpendZeroConfChange", value);
+                setRestartRequired(true);
+            }
+            break;
+        case QuantumSafeStaking:
+            if (settings.value("bQuantumSafeStaking") != value) {
+                settings.setValue("bQuantumSafeStaking", value);
                 setRestartRequired(true);
             }
             break;

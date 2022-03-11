@@ -388,6 +388,8 @@ void XEPGUI::createActions()
     QSettings settings;
     m_hide_orphans_action->setChecked(settings.value("fHideOrphans", true).toBool());
 
+    connect(appLockerAction, &QAction::triggered, appLocker, &AppLocker::showLocker);
+
     connect(quitAction, &QAction::triggered, qApp, QApplication::quit);
     connect(aboutAction, &QAction::triggered, this, &XEPGUI::aboutClicked);
     connect(aboutQtAction, &QAction::triggered, qApp, QApplication::aboutQt);
@@ -399,16 +401,16 @@ void XEPGUI::createActions()
     connect(quitAction, &QAction::triggered, rpcConsole, &QWidget::hide);
     connect(quitAction, &QAction::triggered, appLocker, &QWidget::close);
 
-    websiteLinkAction = new QAction(tr("Website"), this);
+    websiteLinkAction = new QAction(tr("Electra Protocol Website"), this);
     websiteLinkAction->setStatusTip("https://www.electraprotocol.com/");
 
     githubLinkAction = new QAction(tr("GitHub"), this);
     githubLinkAction->setStatusTip("https://github.com/ElectraProtocol/XEP-Core");
 
-    explorerOneAction = new QAction(tr("Explorer 1"), this);
+    explorerOneAction = new QAction(tr("New explorer"), this);
     explorerOneAction->setStatusTip("https://explorer.electraprotocol.network/");
 
-    explorerTwoAction = new QAction(tr("Explorer 2"), this);
+    explorerTwoAction = new QAction(tr("Legacy explorer"), this);
     explorerTwoAction->setStatusTip("https://electraprotocol.network/");
 
     cmcLinkAction = new QAction(tr("CoinMarketCap"), this);
@@ -430,7 +432,6 @@ void XEPGUI::createActions()
         connect(encryptWalletAction, &QAction::triggered, walletFrame, &WalletFrame::encryptWallet);
         connect(unlockWalletAction, &QAction::triggered, walletFrame, &WalletFrame::unlockWallet);
         connect(lockWalletAction, &QAction::triggered, walletFrame, &WalletFrame::lockWallet);
-        connect(appLockerAction, &QAction::triggered, appLocker, &AppLocker::showLocker);
         connect(backupWalletAction, &QAction::triggered, walletFrame, &WalletFrame::backupWallet);
         connect(changePassphraseAction, &QAction::triggered, walletFrame, &WalletFrame::changePassphrase);
         connect(signMessageAction, &QAction::triggered, [this]{ showNormalIfMinimized(); });
@@ -567,6 +568,9 @@ void XEPGUI::createMenuBar()
     });
 #endif
 
+    window_menu->addSeparator();
+    window_menu->addAction(appLockerAction);
+
     if (walletFrame) {
 #ifdef Q_OS_MAC
         window_menu->addSeparator();
@@ -575,8 +579,6 @@ void XEPGUI::createMenuBar()
             GUIUtil::bringToFront(this);
         });
 #endif
-        window_menu->addSeparator();
-        window_menu->addAction(appLockerAction);
         window_menu->addSeparator();
         window_menu->addAction(usedSendingAddressesAction);
         window_menu->addAction(usedReceivingAddressesAction);

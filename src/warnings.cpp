@@ -42,6 +42,12 @@ void SetfLargeWorkInvalidChainFound(bool flag)
     fLargeWorkInvalidChainFound = flag;
 }
 
+void ClearMintWarning()
+{
+    LOCK(g_warnings_mutex);
+    strMintWarning = "";
+}
+
 void SetMintWarning(const std::string& warning)
 {
     LOCK(g_warnings_mutex);

@@ -55,7 +55,7 @@ public:
     bool Condition(int32_t version) const
     {
         uint32_t mask = ((uint32_t)1) << m_bit;
-        return (((version & VERSIONBITS_TOP_MASK) == VERSIONBITS_TOP_BITS) && (version & mask) != 0);
+        return (((version & VERSIONBITS_TOP_MASK) != 0) && (version & mask) != 0);
     }
 
     bool Condition(const CBlockIndex* pindex) const { return Condition(pindex->nVersion); }

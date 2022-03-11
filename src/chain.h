@@ -150,6 +150,8 @@ public:
 
     //! height of the entry in the chain. The genesis block has height 0
     int nHeight{0};
+    int nHeightPoW{0};
+    int nHeightPoS{0};
 
     //! Which # file this block is stored in (blk?????.dat)
     int nFile{0};
@@ -195,7 +197,7 @@ public:
     int64_t nTreasuryPayment{0};
 
     // peercoin: proof-of-stake related block index fields
-    unsigned int nFlags{0};  // peercoin: block index flags
+    unsigned int nFlags{0}; // peercoin: block index flags
     enum
     {
         BLOCK_PROOF_OF_STAKE = (1 << 0), // is proof-of-stake block
@@ -206,10 +208,8 @@ public:
     };
     uint64_t nStakeModifier{0}; // hash modifier for proof-of-stake
     uint256 nStakeModifierV2{}; // hash modifier for proof-of-stake
-    //unsigned int nStakeModifierChecksum{0}; // checksum of index; in-memory only
-    //COutPoint prevoutStake{};
-    //unsigned int nStakeTime{0};
-    //uint256 hashProofOfStake{};
+    unsigned int nStakeModifierChecksum{0}; // checksum of index; in-memory only
+    uint256 hashProofOfStake{};
 
     bool IsProofOfWork() const
     {
@@ -427,6 +427,8 @@ public:
         if (!(s.GetType() & SER_GETHASH)) READWRITE(VARINT_MODE(_nVersion, VarIntMode::NONNEGATIVE_SIGNED));
 
         READWRITE(VARINT_MODE(obj.nHeight, VarIntMode::NONNEGATIVE_SIGNED));
+        READWRITE(VARINT_MODE(obj.nHeightPoW, VarIntMode::NONNEGATIVE_SIGNED));
+        READWRITE(VARINT_MODE(obj.nHeightPoS, VarIntMode::NONNEGATIVE_SIGNED));
         READWRITE(VARINT(obj.nStatus));
         READWRITE(VARINT(obj.nTx));
         if (obj.nStatus & (BLOCK_HAVE_DATA | BLOCK_HAVE_UNDO)) READWRITE(VARINT_MODE(obj.nFile, VarIntMode::NONNEGATIVE_SIGNED));
@@ -444,11 +446,9 @@ public:
         if (obj.IsTreasuryBlock()) {
             READWRITE(obj.nTreasuryPayment);
         }
-        /*if (obj.IsProofOfStake()) {
-            READWRITE(obj.prevoutStake);
-            READWRITE(obj.nStakeTime);
+        if (obj.IsProofOfStake()) {
             READWRITE(obj.hashProofOfStake);
-        }*/
+        }
 
         // block header
         READWRITE(obj.nVersion);

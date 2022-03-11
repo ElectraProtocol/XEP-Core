@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2018 The Bitcoin Core developers
-// Copyright (c) 2018-2020 John "ComputerCraftr" Studnicka
+// Copyright (c) 2018-2022 John "ComputerCraftr" Studnicka
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -15,27 +15,48 @@
 
 #include <mutex>
 
-Mutex cs_target_cache;
+static Mutex cs_target_cache;
 
 // peercoin: find last block index up to pindex
 static inline const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, const bool fProofOfStake)
 {
-    while (pindex && pindex->pprev && pindex->IsProofOfStake() != fProofOfStake)
+    while (pindex && pindex->IsProofOfStake() != fProofOfStake && pindex->pprev)
         pindex = pindex->pprev;
     return pindex;
 }
 
 static inline const CBlockIndex* GetLastBlockIndexForAlgo(const CBlockIndex* pindex, const int& algo)
 {
-    while (pindex && pindex->pprev && CBlockHeader::GetAlgo(pindex->nVersion) != algo)
+    while (pindex && CBlockHeader::GetAlgoType(pindex->nVersion) != algo && pindex->pprev)
         pindex = pindex->pprev;
     return pindex;
 }
 
+static inline const CBlockIndex* GetASERTReferenceBlockForAlgo(const CBlockIndex* pindex, const int& nASERTStartHeight, const int& algo)
+{
+    if (!pindex)
+        return pindex;
+
+    while (pindex->nHeight >= nASERTStartHeight) {
+        const CBlockIndex* pprev = GetLastBlockIndexForAlgo(pindex->pprev, algo);
+        if (pprev)
+            pindex = pprev;
+        else
+            break;
+    }
+    return pindex;
+}
+
+// Note that calling this function as part of the difficulty calculation for every block results in a time complexity of O(n^2)
+// with respect to the number of blocks in the chain as it must count back to the reference block each time it is called while syncing
 static inline const CBlockIndex* GetASERTReferenceBlockAndHeightForAlgo(const CBlockIndex* pindex, const uint32_t& nProofOfWorkLimit, const int& nASERTStartHeight, const int& algo, uint32_t& nBlocksPassed)
 {
     nBlocksPassed = 1; // Account for the ASERT reference block here
-    while (pindex && pindex->pprev && pindex->nHeight >= nASERTStartHeight) {
+
+    if (!pindex)
+        return pindex;
+
+    while (pindex->nHeight >= nASERTStartHeight) {
         const CBlockIndex* pprev = GetLastBlockIndexForAlgo(pindex->pprev, algo);
         if (pprev)
             pindex = pprev;
@@ -50,8 +71,8 @@ static inline const CBlockIndex* GetASERTReferenceBlockAndHeightForAlgo(const CB
 
 unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
 {
-    const int algo = CBlockHeader::GetAlgo(pblock->nVersion);
-    const uint32_t nProofOfWorkLimit = UintToArith256(params.powLimit[algo == -1 ? CBlockHeader::ALGO_POW_SHA256 : algo]).GetCompact();
+    const int algo = CBlockHeader::GetAlgoType(pblock->nVersion);
+    const uint32_t nProofOfWorkLimit = UintToArith256(params.powLimit[algo == -1 ? CBlockHeader::AlgoType::ALGO_POW_SHA256 : algo]).GetCompactBase256();
     if (pindexLast == nullptr || params.fPowNoRetargeting)
         return nProofOfWorkLimit;
 
@@ -65,7 +86,7 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
         if (pindexPrev->pprev && pindexPrev->nBits == (nProofOfWorkLimit - 1)) {
             // Return the block before the last non-special-min-difficulty-rules-block
             const CBlockIndex* pindex = pindexPrev;
-            while (pindex->pprev && (pindex->nBits == (nProofOfWorkLimit - 1) || CBlockHeader::GetAlgo(pindex->nVersion) != algo))
+            while (pindex->pprev && (pindex->nBits == (nProofOfWorkLimit - 1) || CBlockHeader::GetAlgoType(pindex->nVersion) != algo))
                 pindex = pindex->pprev;
             const CBlockIndex* pprev = GetLastBlockIndexForAlgo(pindex->pprev, algo);
             if (pprev && pprev->nHeight > 10) {
@@ -84,7 +105,7 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
 unsigned int GetNextWorkRequiredXEP(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
 {
     assert(pindexLast != nullptr);
-    unsigned int nProofOfWorkLimit = UintToArith256(params.powLimit[CBlockHeader::ALGO_POW_SHA256]).GetCompact();
+    unsigned int nProofOfWorkLimit = UintToArith256(params.powLimit[CBlockHeader::AlgoType::ALGO_POW_SHA256]).GetCompactBase256();
 
     // Only change once per difficulty adjustment interval
     if ((pindexLast->nHeight+1) % params.DifficultyAdjustmentInterval() != 0)
@@ -130,44 +151,45 @@ unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, int64_t nF
         nActualTimespan = params.nPowTargetTimespan*4;
 
     // Retarget
-    const arith_uint256 bnPowLimit = UintToArith256(params.powLimit[CBlockHeader::ALGO_POW_SHA256]);
+    const arith_uint256 bnPowLimit = UintToArith256(params.powLimit[CBlockHeader::AlgoType::ALGO_POW_SHA256]);
     arith_uint256 bnNew;
-    bnNew.SetCompact(pindexLast->nBits);
+    bnNew.SetCompactBase256(pindexLast->nBits);
     bnNew *= nActualTimespan;
     bnNew /= params.nPowTargetTimespan;
 
     if (bnNew > bnPowLimit)
         bnNew = bnPowLimit;
 
-    return bnNew.GetCompact();
+    return bnNew.GetCompactBase256();
 }
 
 unsigned int WeightedTargetExponentialMovingAverage(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
 {
-    const int algo = CBlockHeader::GetAlgo(pblock->nVersion);
+    const int algo = CBlockHeader::GetAlgoType(pblock->nVersion);
+    const bool fAlgoMissing = algo == -1;
     const bool fProofOfStake = pblock->IsProofOfStake();
-    const arith_uint256 bnPowLimit = algo == -1 ? UintToArith256(params.powLimit[fProofOfStake ? CBlockHeader::ALGO_POS : CBlockHeader::ALGO_POW_SHA256]) : UintToArith256(params.powLimit[algo]);
-    const uint32_t nProofOfWorkLimit = bnPowLimit.GetCompact();
+    const arith_uint256 bnPowLimit = fAlgoMissing ? UintToArith256(params.powLimit[fProofOfStake ? CBlockHeader::AlgoType::ALGO_POS : CBlockHeader::AlgoType::ALGO_POW_SHA256]) : UintToArith256(params.powLimit[algo]);
+    const uint32_t nProofOfWorkLimit = bnPowLimit.GetCompactBase256();
     if (pindexLast == nullptr)
         return nProofOfWorkLimit; // genesis block
 
-    const CBlockIndex* pindexPrev = algo == -1 ? GetLastBlockIndex(pindexLast, fProofOfStake) : GetLastBlockIndexForAlgo(pindexLast, algo);
+    const CBlockIndex* pindexPrev = fAlgoMissing ? GetLastBlockIndex(pindexLast, fProofOfStake) : GetLastBlockIndexForAlgo(pindexLast, algo);
     if (pindexPrev->pprev == nullptr)
         return nProofOfWorkLimit; // first block
 
-    const CBlockIndex* pindexPrevPrev = algo == -1 ? GetLastBlockIndex(pindexPrev->pprev, fProofOfStake) : GetLastBlockIndexForAlgo(pindexPrev->pprev, algo);
+    const CBlockIndex* pindexPrevPrev = fAlgoMissing ? GetLastBlockIndex(pindexPrev->pprev, fProofOfStake) : GetLastBlockIndexForAlgo(pindexPrev->pprev, algo);
     if (pindexPrevPrev->pprev == nullptr)
         return nProofOfWorkLimit; // second block
 
     int nActualSpacing = pindexPrev->GetBlockTime() - pindexPrevPrev->GetBlockTime(); // Difficulty for PoW and PoS are calculated separately
 
     arith_uint256 bnNew;
-    bnNew.SetCompact(pindexPrev->nBits);
+    bnNew.SetCompactBase256(pindexPrev->nBits);
     int nTargetSpacing = params.nPowTargetSpacing;
     const uint32_t nTargetTimespan = params.nPowTargetTimespan;
     //nTargetSpacing *= 2; // 160 second block time for PoW + 160 second block time for PoS = 80 second effective block time
     if (!fProofOfStake) {
-        //nTargetSpacing *= (CBlockHeader::ALGO_COUNT - 1); // Multiply by the number of PoW algos
+        //nTargetSpacing *= (CBlockHeader::AlgoType::ALGO_COUNT - 1); // Multiply by the number of PoW algos
         nTargetSpacing = 10 * 60; // PoW spacing is 10 minutes
     }
     const int nInterval = nTargetTimespan / (nTargetSpacing * 2); // alpha_reciprocal = (N(SMA) + 1) / 2 for same "center of mass" as SMA
@@ -187,34 +209,35 @@ unsigned int WeightedTargetExponentialMovingAverage(const CBlockIndex* pindexLas
     if (bnNew512 > arith_uint512(bnPowLimit) || bnNew == arith_uint256())
         return nProofOfWorkLimit;
 
-    return bnNew.GetCompactRounded();
+    return bnNew.GetCompactRoundedBase256();
 }
 
 unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
 {
-    const int algo = CBlockHeader::GetAlgo(pblock->nVersion);
+    const int algo = CBlockHeader::GetAlgoType(pblock->nVersion);
+    const bool fAlgoMissing = algo == -1;
     const bool fProofOfStake = pblock->IsProofOfStake();
-    const arith_uint256 bnPowLimit = algo == -1 ? UintToArith256(params.powLimit[fProofOfStake ? CBlockHeader::ALGO_POS : CBlockHeader::ALGO_POW_SHA256]) : UintToArith256(params.powLimit[algo]);
-    const uint32_t nProofOfWorkLimit = bnPowLimit.GetCompact();
+    const arith_uint256 bnPowLimit = fAlgoMissing ? UintToArith256(params.powLimit[fProofOfStake ? CBlockHeader::AlgoType::ALGO_POS : CBlockHeader::AlgoType::ALGO_POW_SHA256]) : UintToArith256(params.powLimit[algo]);
+    const uint32_t nProofOfWorkLimit = bnPowLimit.GetCompactBase256();
     uint32_t nTargetSpacing = params.nPowTargetSpacing;
     //nTargetSpacing *= 2; // 160 second block time for PoW + 160 second block time for PoS = 80 second effective block time
     if (!fProofOfStake) {
-        //nTargetSpacing *= (CBlockHeader::ALGO_COUNT - 1); // Multiply by the number of PoW algos
+        //nTargetSpacing *= (CBlockHeader::AlgoType::ALGO_COUNT - 1); // Multiply by the number of PoW algos
         nTargetSpacing = 10 * 60; // PoW spacing is 10 minutes
     }
 
     if (pindexLast == nullptr)
         return nProofOfWorkLimit; // genesis block
 
-    const CBlockIndex* pindexPrev = algo == -1 ? GetLastBlockIndex(pindexLast, fProofOfStake) : GetLastBlockIndexForAlgo(pindexLast, algo);
+    const CBlockIndex* pindexPrev = fAlgoMissing ? GetLastBlockIndex(pindexLast, fProofOfStake) : GetLastBlockIndexForAlgo(pindexLast, algo);
     if (pindexPrev->pprev == nullptr)
         return nProofOfWorkLimit; // first block
 
-    const CBlockIndex* pindexPrevPrev = algo == -1 ? GetLastBlockIndex(pindexPrev->pprev, fProofOfStake) : GetLastBlockIndexForAlgo(pindexPrev->pprev, algo);
+    const CBlockIndex* pindexPrevPrev = fAlgoMissing ? GetLastBlockIndex(pindexPrev->pprev, fProofOfStake) : GetLastBlockIndexForAlgo(pindexPrev->pprev, algo);
     if (pindexPrevPrev->pprev == nullptr)
         return nProofOfWorkLimit; // second block
 
-    const uint32_t nASERTStartHeight = 0;
+    constexpr uint32_t nASERTStartHeight = 0;
     // In the future, it may be a good idea to switch this from height based to a fixed time window
     const uint32_t nASERTBlockTargetsToAverage = 4 * params.nPowTargetTimespan / nTargetSpacing; // Average the past 2 days' worth of block targets
 
@@ -222,55 +245,61 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
     if (nHeight < nASERTStartHeight)
         return WeightedTargetExponentialMovingAverage(pindexLast, pblock, params);
 
-    uint32_t nBlocksPassed = 0;
-    const CBlockIndex* pindexReferenceBlock = GetASERTReferenceBlockAndHeightForAlgo(pindexPrev, nProofOfWorkLimit, nASERTStartHeight, algo, nBlocksPassed);
-    const CBlockIndex* pindexReferenceBlockPrev = algo == -1 ? GetLastBlockIndex(pindexReferenceBlock->pprev, fProofOfStake) : GetLastBlockIndexForAlgo(pindexReferenceBlock->pprev, algo);
+    const uint32_t nBlocksPassed = (fProofOfStake ? pindexLast->nHeightPoS : pindexLast->nHeightPoW) + 1; // Account for the ASERT reference block by adding one to the height
+
+    // Using a static variable concurrently in this context is safe and will not cause a race condition during initialization because C++11 guarantees that static variables will be initialized exactly once
+    static const CBlockIndex* const pindexReferenceBlocks[CBlockHeader::AlgoType::ALGO_COUNT] = {
+        GetASERTReferenceBlockForAlgo(pindexPrev, nASERTStartHeight, CBlockHeader::AlgoType::ALGO_POS),
+        GetASERTReferenceBlockForAlgo(pindexPrev, nASERTStartHeight, CBlockHeader::AlgoType::ALGO_POW_SHA256),
+    };
+
+    const CBlockIndex* const pindexReferenceBlock = fAlgoMissing ? pindexReferenceBlocks[fProofOfStake ? CBlockHeader::AlgoType::ALGO_POS : CBlockHeader::AlgoType::ALGO_POW_SHA256] : pindexReferenceBlocks[algo];
+    const CBlockIndex* const pindexReferenceBlockPrev = fAlgoMissing ? GetLastBlockIndex(pindexReferenceBlock->pprev, fProofOfStake) : GetLastBlockIndexForAlgo(pindexReferenceBlock->pprev, algo);
+
     // Use reference block's parent block's timestamp unless it is the genesis (not using the prev timestamp here would put us permanently one block behind schedule)
     int64_t refBlockTimestamp = pindexReferenceBlockPrev ? pindexReferenceBlockPrev->GetBlockTime() : (pindexReferenceBlock->GetBlockTime() - nTargetSpacing);
+
     // The reference timestamp must be divisible by (nStakeTimestampMask+1) or else the PoS block emission will never be exactly on schedule
     if (fProofOfStake) {
         while ((refBlockTimestamp & params.nStakeTimestampMask) != 0)
             refBlockTimestamp++;
     }
+
     const int64_t nTimeDiff = pindexPrev->GetBlockTime() - refBlockTimestamp;
-    //LogPrintf("pindexReferenceBlock->GetBlockHash() = %s\n", pindexReferenceBlock->GetBlockHash().ToString().c_str());
-    //LogPrintf("nBlocksPassed = %u\n", nBlocksPassed);
-    //LogPrintf("pindexPrev->nHeight + 1 - pindexReferenceBlock->nHeight = %u\n", pindexPrev->nHeight + 1 - pindexReferenceBlock->nHeight);
-    //assert(nBlocksPassed == (uint32_t)pindexPrev->nHeight + 1 - pindexReferenceBlock->nHeight);
     const uint32_t nHeightDiff = nBlocksPassed; //pindexPrev->nHeight + 1 - pindexReferenceBlock->nHeight;
     arith_uint256 refBlockTarget;
 
     // We don't want to recalculate the average of several days' worth of block targets here every single time, so instead we cache the average and start height
-    const bool fUseCache = true;
+    constexpr bool fUseCache = true;
     {
         LOCK(cs_target_cache);
 
         static arith_uint256 refBlockTargetCache;
-        static int nTargetCacheHeight = -1;
-        static int nTargetCacheAlgo = CBlockHeader::ALGO_COUNT;
+        static int nTargetCacheHeight = -2;
+        static int nTargetCacheAlgo = CBlockHeader::AlgoType::ALGO_COUNT;
 
         if (nASERTBlockTargetsToAverage > 0 && nHeight >= nASERTStartHeight + nASERTBlockTargetsToAverage && nHeightDiff >= nASERTBlockTargetsToAverage) {
-            if (!fUseCache || nTargetCacheHeight != (int)(nHeightDiff / nASERTBlockTargetsToAverage) || nTargetCacheAlgo != algo || refBlockTargetCache == arith_uint256() || algo == -1) {
+            if (!fUseCache || nTargetCacheHeight != static_cast<int>(nHeightDiff / nASERTBlockTargetsToAverage) || nTargetCacheAlgo != algo || refBlockTargetCache == arith_uint256() || fAlgoMissing) {
                 const uint32_t nBlocksToSkip = nHeightDiff % nASERTBlockTargetsToAverage;
                 const CBlockIndex* pindex = pindexPrev;
                 //LogPrintf("nBlocksToSkip = %u\n", nBlocksToSkip);
 
                 for (unsigned int i = 0; i < nBlocksToSkip; i++) {
-                    pindex = algo == -1 ? GetLastBlockIndex(pindex->pprev, fProofOfStake) : GetLastBlockIndexForAlgo(pindex->pprev, algo);
+                    pindex = fAlgoMissing ? GetLastBlockIndex(pindex->pprev, fProofOfStake) : GetLastBlockIndexForAlgo(pindex->pprev, algo);
                 }
                 //LogPrintf("begin pindex->nHeight = %i\n", pindex->nHeight);
 
                 //unsigned int nBlocksAveraged = 0;
-                for (int i = 0; i < (int)nASERTBlockTargetsToAverage; i++) {
+                for (int i = 0; i < static_cast<int>(nASERTBlockTargetsToAverage); i++) {
                     if (pindex->nBits != (nProofOfWorkLimit - 1) || !params.fPowAllowMinDifficultyBlocks) { // Don't add min difficulty targets to the average
-                        arith_uint256 bnTarget = arith_uint256().SetCompact(pindex->nBits);
+                        arith_uint256 bnTarget = arith_uint256().SetCompactBase256(pindex->nBits);
                         refBlockTarget += bnTarget / nASERTBlockTargetsToAverage;
                         //nBlocksAveraged++;
                         //if (pindex->GetBlockHash() == params.hashGenesisBlock)
                             //LogPrintf("Averaging genesis block target\n");
                     } else
                         i--; // Average one more block to make up for the one we skipped
-                    pindex = algo == -1 ? GetLastBlockIndex(pindex->pprev, fProofOfStake) : GetLastBlockIndexForAlgo(pindex->pprev, algo);
+                    pindex = fAlgoMissing ? GetLastBlockIndex(pindex->pprev, fProofOfStake) : GetLastBlockIndexForAlgo(pindex->pprev, algo);
                     if (!pindex)
                         break;
                 }
@@ -289,16 +318,16 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
                 //LogPrintf("Using average target cache at nHeight = %u with algo = %i\n", nHeight, algo);
             }
         } else {
-            if (fUseCache && algo != -1) {
+            if (fUseCache && !fAlgoMissing) {
                 if (nTargetCacheHeight != -1 || nTargetCacheAlgo != algo || refBlockTargetCache == arith_uint256()) {
-                    refBlockTargetCache = arith_uint256().SetCompact(pindexReferenceBlock->nBits);
+                    refBlockTargetCache = arith_uint256().SetCompactBase256(pindexReferenceBlock->nBits);
                     nTargetCacheHeight = -1;
                     nTargetCacheAlgo = algo;
                     //LogPrintf("Set ref target cache at nHeight = %u with algo = %i\n", nHeight, algo);
                 }
                 refBlockTarget = refBlockTargetCache;
             } else
-                refBlockTarget = arith_uint256().SetCompact(pindexReferenceBlock->nBits);
+                refBlockTarget = arith_uint256().SetCompactBase256(pindexReferenceBlock->nBits);
         }
     }
 
@@ -310,8 +339,8 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
     const int exponent = dividend / divisor; // Note: this integer division rounds down positive and rounds up negative numbers via truncation, but the truncated fractional part is handled by the approximation below
     const uint32_t remainder = (fPositive ? dividend : -dividend) % divisor; // Must be positive
     // We are using uint512 rather than uint64_t here because a nPowTargetTimespan of more than 3 days in the divisor may cause the following cubic approximation to overflow a uint64_t
-    arith_uint512 numerator = 1;
-    arith_uint512 denominator = 1;
+    arith_uint512 numerator(1);
+    arith_uint512 denominator(1);
     // Alternatively, ensure that the nPowTargetTimespan (divisor) is small enough such that (2*2*2) * (4 + 11 + 35 + 50) * (divisor)^3 < (2^64 - 1) which is the uint64_t maximum value to leave some room and make overflow extremely unlikely
     //assert(divisor <= (3 * 24 * 60 * 60));
     // Keep in mind that a large exponent due to being extremely far ahead or behind schedule, especially in case of reviving an abandoned chain, will also lead to overflowing the numerator, so a less accurate approximation should be used in this case
@@ -320,8 +349,10 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
 
     //LogPrintf("nHeight = %u, algo = %i is %s schedule, nTimeDiff = %li, ideal = %u, exponent = %i\n", nHeight, algo, fPositive ? "behind" : "ahead of", nTimeDiff, nTargetSpacing * nHeightDiff, exponent);
     if (fPositive) {
-        for (int i = 0; i < exponent; i++)
-            numerator *= 2;
+        if (exponent > 0) {
+            // Left shifting the numerator is equivalent to multiplying it by a power of 2
+            numerator <<= exponent;
+        }
 
         if (remainder != 0) { // Approximate 2^x with (4x^3+11x^2+35x+50)/50 for 0<x<1 (must be equal to 1 at x=0 and equal to 2 at x=1 to avoid discontinuities) - note: x+1 and (3x^2+7x+10)/10 are also decent and less complicated approximations
             //numerator *= remainder + divisor; // x+1
@@ -335,8 +366,10 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
             //denominator = denominator * (50lu * divisor*divisor*divisor);
         }
     } else {
-        for (int i = 0; i > exponent; i--)
-            denominator *= 2;
+        if (exponent < 0) {
+            // Left shifting the denominator is equivalent to multiplying it by a power of 2
+            denominator <<= -exponent;
+        }
 
         if (remainder != 0) { // Approximate 2^x with (4x^3+11x^2+35x+50)/50 for 0<x<1 (must be equal to 1 at x=0 and equal to 2 at x=1 to avoid discontinuities) - note: x+1 and (3x^2+7x+10)/10 are also decent and less complicated approximations
             //numerator *= divisor;
@@ -352,7 +385,8 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
     }
 
     // Keep in mind the order of operations and integer division here - this is why the *= operator cannot be used, as it could cause overflow or integer division to occur
-    arith_uint512 bnNew512 = arith_uint512(bnNew) * arith_uint512(numerator) / arith_uint512(denominator);
+    arith_uint512 bnNew512(arith_uint512(bnNew) * numerator / denominator);
+    //arith_uint512 bnNew512(arith_uint512(bnNew) * arith_uint512(numerator) / arith_uint512(denominator));
     bnNew = bnNew512.trim256();
 
     //LogPrintf("numerator = %s\n", numerator.ToString().c_str());
@@ -363,7 +397,7 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
     if (bnNew512 > arith_uint512(bnPowLimit) || bnNew == arith_uint256())
         return nProofOfWorkLimit;
 
-    return bnNew.GetCompactRounded();
+    return bnNew.GetCompactRoundedBase256();
 }
 
 bool CheckProofOfWork(const uint256& hash, const unsigned int& nBits, const int& algo, const Consensus::Params& params)
@@ -372,10 +406,10 @@ bool CheckProofOfWork(const uint256& hash, const unsigned int& nBits, const int&
     bool fOverflow;
     arith_uint256 bnTarget;
 
-    bnTarget.SetCompact(nBits, &fNegative, &fOverflow);
+    bnTarget.SetCompactBase256(nBits, &fNegative, &fOverflow);
 
     // Check range
-    if (fNegative || bnTarget == 0 || fOverflow || algo < -1 || algo == CBlockHeader::ALGO_POS || algo >= CBlockHeader::ALGO_COUNT || bnTarget > UintToArith256(params.powLimit[algo == -1 ? CBlockHeader::ALGO_POW_SHA256 : algo]))
+    if (fNegative || bnTarget == 0 || fOverflow || algo < -1 || algo == CBlockHeader::AlgoType::ALGO_POS || algo >= CBlockHeader::AlgoType::ALGO_COUNT || bnTarget > UintToArith256(params.powLimit[algo == -1 ? CBlockHeader::AlgoType::ALGO_POW_SHA256 : algo]))
         return false;
 
     // Check proof of work matches claimed amount

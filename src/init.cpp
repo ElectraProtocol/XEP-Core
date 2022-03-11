@@ -191,6 +191,9 @@ void Shutdown(NodeContext& node)
     util::ThreadRename("shutoff");
     if (node.mempool) node.mempool->AddTransactionsUpdated(1);
 
+#ifdef ENABLE_WALLET
+    StopStakingThreads();
+#endif // ENABLE_WALLET
     StopHTTPRPC();
     StopREST();
     StopRPC();
@@ -1584,6 +1587,7 @@ bool AppInitMain(const util::Ref& context, NodeContext& node, interfaces::BlockA
     LogPrintf("* Using %.1f MiB for in-memory UTXO set (plus up to %.1f MiB of unused mempool space)\n", nCoinCacheUsage * (1.0 / 1024 / 1024), nMempoolSizeMax * (1.0 / 1024 / 1024));
 
     bool fLoaded = false;
+    bool fInitializedChainstate = false;
     while (!fLoaded && !ShutdownRequested()) {
         bool fReset = fReindex;
         auto is_coinsview_empty = [&](CChainState* chainstate) EXCLUSIVE_LOCKS_REQUIRED(::cs_main) {
@@ -1597,7 +1601,10 @@ bool AppInitMain(const util::Ref& context, NodeContext& node, interfaces::BlockA
             const int64_t load_block_index_start_time = GetTimeMillis();
             try {
                 LOCK(cs_main);
-                chainman.InitializeChainstate(*Assert(node.mempool));
+                if (!fInitializedChainstate) {
+                    chainman.InitializeChainstate(*Assert(node.mempool));
+                    fInitializedChainstate = true;
+                }
                 chainman.m_total_coinstip_cache = nCoinCacheUsage;
                 chainman.m_total_coinsdb_cache = nCoinDBCache;
 
@@ -2033,11 +2040,14 @@ bool AppInitMain(const util::Ref& context, NodeContext& node, interfaces::BlockA
         banman->DumpBanlist();
     }, DUMP_BANS_INTERVAL);
 
+#ifdef ENABLE_WALLET
     std::vector<std::shared_ptr<CWallet>> wallets = GetWallets();
     for (unsigned int i = 0; i < wallets.size(); i++) {
-        if (wallets[i])
-            MintStake(threadGroup, wallets[i], i+1, node.chainman, node.connman.get(), node.mempool.get());
+        if (wallets[i]) {
+            wallets[i]->SetStakingThread(CreateStakingThread(wallets[i], node.chainman, node.connman.get(), node.mempool.get()));
+        }
     }
+#endif // ENABLE_WALLET
 
 #if HAVE_SYSTEM
     StartupNotify(args);

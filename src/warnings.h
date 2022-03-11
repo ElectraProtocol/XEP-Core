@@ -15,6 +15,7 @@ void SetfLargeWorkForkFound(bool flag);
 bool GetfLargeWorkForkFound();
 void SetfLargeWorkInvalidChainFound(bool flag);
 void SetMintWarning(const std::string& warning);
+void ClearMintWarning();
 std::string GetMintWarning();
 /** Format a string that describes several potential problems detected by the core.
  * @param[in] verbose bool

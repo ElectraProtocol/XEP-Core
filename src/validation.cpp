@@ -1197,7 +1197,7 @@ bool ReadBlockFromDisk(CBlock& block, const FlatFilePos& pos, const Consensus::P
     }
 
     // Check the header
-    const int algo = CBlockHeader::GetAlgo(block.nVersion);
+    const int algo = CBlockHeader::GetAlgoType(block.nVersion);
     if (block.IsProofOfWork() && !CheckProofOfWork(block.GetPoWHash(), block.nBits, algo, consensusParams))
         return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
 
@@ -1938,7 +1938,7 @@ VersionBitsCache versionbitscache GUARDED_BY(cs_main);
 int32_t ComputeBlockVersion(const CBlockIndex* pindexPrev, int algo, const Consensus::Params& params)
 {
     LOCK(cs_main);
-    int32_t nVersion = CBlockHeader::GetVer(algo); //VERSIONBITS_TOP_BITS;
+    int32_t nVersion = CBlockHeader::GetAlgoFlag(algo); // VERSIONBITS_TOP_BITS;
 
     for (int i = 0; i < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; i++) {
         ThresholdState state = VersionBitsState(pindexPrev, params, static_cast<Consensus::DeploymentPos>(i), versionbitscache);
@@ -1969,9 +1969,9 @@ public:
     bool Condition(const CBlockIndex* pindex, const Consensus::Params& params) const override
     {
         return pindex->nHeight >= params.MinBIP9WarningHeight &&
-               ((pindex->nVersion & VERSIONBITS_TOP_MASK) == VERSIONBITS_TOP_BITS) &&
+               ((pindex->nVersion & VERSIONBITS_TOP_MASK) != 0) &&
                ((pindex->nVersion >> bit) & 1) != 0 &&
-               ((ComputeBlockVersion(pindex->pprev, CBlockHeader::GetAlgo(pindex->nVersion), params) >> bit) & 1) == 0;
+               ((ComputeBlockVersion(pindex->pprev, CBlockHeader::GetAlgoType(pindex->nVersion), params) >> bit) & 1) == 0;
     }
 };
 
@@ -2054,7 +2054,7 @@ static inline bool ContextualCheckPoSBlock(const CBlock& block, const bool& fPro
     }
 
     // peercoin: compute stake entropy bit for stake modifier
-    unsigned int nEntropyBit = GetStakeEntropyBit(block);
+    const unsigned int nEntropyBit = GetStakeEntropyBit(block);
 
     // peercoin: compute stake modifier
     uint64_t nStakeModifier = 0;
@@ -2074,43 +2074,44 @@ static inline bool ContextualCheckPoSBlock(const CBlock& block, const bool& fPro
     //fGeneratedStakeModifier = true;
 
   // compute nStakeModifierChecksum begin
-    /*unsigned int nFlagsBackup      = pindex->nFlags;
-    uint64_t nStakeModifierBackup  = pindex->nStakeModifier;
-    uint256 hashProofOfStakeBackup = pindex->hashProofOfStake;
+    const unsigned int nFlagsBackup      = pindex->nFlags;
+    const uint64_t nStakeModifierBackup  = pindex->nStakeModifier;
+    const uint256 hashProofOfStakeBackup = pindex->hashProofOfStake;
 
     // set necessary pindex fields
     if (!pindex->SetStakeEntropyBit(nEntropyBit))
         return error("ConnectBlock(): SetStakeEntropyBit() failed");
     pindex->SetStakeModifier(nStakeModifier, fGeneratedStakeModifier);
-    pindex->hashProofOfStake = hashProofOfStake;
+    if (fProofOfStake) {
+        pindex->hashProofOfStake = hashProofOfStake;
+    }
 
-    unsigned int nStakeModifierChecksum = GetStakeModifierChecksum(pindex);
+    const unsigned int nStakeModifierChecksum = GetStakeModifierChecksum(pindex);
 
     // undo pindex fields
     pindex->nFlags           = nFlagsBackup;
     pindex->nStakeModifier   = nStakeModifierBackup;
-    pindex->hashProofOfStake = hashProofOfStakeBackup;
+    if (fProofOfStake) {
+        pindex->hashProofOfStake = hashProofOfStakeBackup;
+    }
   // compute nStakeModifierChecksum end
 
     if (!CheckStakeModifierCheckpoints(pindex->nHeight, nStakeModifierChecksum))
-        return error("ConnectBlock(): Rejected by stake modifier checkpoint height=%d, modifier=0x%016llx", pindex->nHeight, nStakeModifier);*/
+        return error("ConnectBlock(): Rejected by stake modifier checkpoint height=%d, modifier=0x%016llx", pindex->nHeight, nStakeModifier);
 
     if (fJustCheck)
         return true;
 
 
     // write everything to index
-    /*if (fProofOfStake)
-    {
-        pindex->prevoutStake = block.vtx[1]->vin[0].prevout;
-        pindex->nStakeTime = block.vtx[1]->nTime;
-        pindex->hashProofOfStake = hashProofOfStake;
-    }*/
     if (!pindex->SetStakeEntropyBit(nEntropyBit))
         return error("ConnectBlock(): SetStakeEntropyBit() failed");
     pindex->SetStakeModifier(nStakeModifier, fGeneratedStakeModifier);
     //pindex->SetStakeModifierV2(nStakeModifierV2, fGeneratedStakeModifier);
-    //pindex->nStakeModifierChecksum = nStakeModifierChecksum;
+    if (fProofOfStake) {
+        pindex->hashProofOfStake = hashProofOfStake;
+    }
+    pindex->nStakeModifierChecksum = nStakeModifierChecksum;
     setDirtyBlockIndex.insert(pindex);  // queue a write to disk
 
     return true;
@@ -2300,12 +2301,13 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
     // post BIP34 before approximately height 486,000,000 and presumably will
     // be reset before it reaches block 1,983,702 and starts doing unnecessary
     // BIP30 checking again.
-    CBlockIndex *pindexBIP34height = nullptr;
+    CBlockIndex* pindexBIP34height = nullptr;
     if (pindex->GetBlockHash() != chainparams.GetConsensus().hashGenesisBlock) {
         assert(pindex->pprev);
         pindexBIP34height = pindex->pprev->GetAncestor(chainparams.GetConsensus().BIP34Height);
-    } else
+    } else {
         fEnforceBIP30 = false;
+    }
     //Only continue to enforce if we're below BIP34 activation height or the block hash at that height doesn't correspond.
     fEnforceBIP30 = fEnforceBIP30 && (!pindexBIP34height || !(pindexBIP34height->GetBlockHash() == chainparams.GetConsensus().BIP34Hash));
 
@@ -2447,7 +2449,7 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
         nExpectedBlockReward += nTreasuryPayment;
 
         unsigned int found = 0;
-        for (const std::pair<CScript, unsigned int>& payee : treasuryPayees) {
+        for (const std::pair<const CScript, unsigned int>& payee : treasuryPayees) {
             for (const CTxOut& out : txNew.vout) {
                 if (out.scriptPubKey == payee.first && out.nValue == nTreasuryPayment * payee.second / 100) {
                     nActualTreasuryPayment += out.nValue;
@@ -2740,14 +2742,14 @@ static void UpdateTip(CTxMemPool& mempool, const CBlockIndex* pindexNew, const C
         // Check the version of the last 100 blocks to see if we need to upgrade:
         for (int i = 0; i < 100 && pindex != nullptr; i++)
         {
-            int32_t nExpectedVersion = ComputeBlockVersion(pindex->pprev, CBlockHeader::GetAlgo(pindex->nVersion), chainParams.GetConsensus());
+            int32_t nExpectedVersion = ComputeBlockVersion(pindex->pprev, CBlockHeader::GetAlgoType(pindex->nVersion), chainParams.GetConsensus());
             if (pindex->nVersion > VERSIONBITS_LAST_OLD_BLOCK_VERSION && (pindex->nVersion & ~nExpectedVersion) != 0)
                 ++num_unexpected_version;
             pindex = pindex->pprev;
         }
     }
     LogPrintf("%s: new best=%s height=%d version=0x%08x type=%i log2_work=%f tx=%lu date='%s' progress=%f cache=%.1fMiB(%utxo)%s\n", __func__,
-      pindexNew->GetBlockHash().ToString(), pindexNew->nHeight, pindexNew->nVersion, CBlockHeader::GetAlgo(pindexNew->nVersion) == -1 ? pindexNew->IsProofOfWork() : CBlockHeader::GetAlgo(pindexNew->nVersion),
+      pindexNew->GetBlockHash().ToString(), pindexNew->nHeight, pindexNew->nVersion, CBlockHeader::GetAlgoType(pindexNew->nVersion) == -1 ? pindexNew->IsProofOfWork() : CBlockHeader::GetAlgoType(pindexNew->nVersion),
       log(pindexNew->nChainWork.getdouble())/log(2.0), (unsigned long)pindexNew->nChainTx,
       FormatISO8601DateTime(pindexNew->GetBlockTime()),
       GuessVerificationProgress(chainParams.TxData(), pindexNew), ::ChainstateActive().CoinsTip().DynamicMemoryUsage() * (1.0 / (1<<20)), ::ChainstateActive().CoinsTip().GetCacheSize(),
@@ -3469,8 +3471,16 @@ CBlockIndex* BlockManager::AddToBlockIndex(const CBlockHeader& block)
         pindexNew->BuildSkip();
     }
     pindexNew->nTimeMax = (pindexNew->pprev ? std::max(pindexNew->pprev->nTimeMax, pindexNew->nTime) : pindexNew->nTime);
-    if (block.IsProofOfStake())
+    if (block.IsProofOfStake()) {
         pindexNew->SetProofOfStake();
+        if (pindexNew->pprev) { // Increase the count of PoS blocks in the chain
+            pindexNew->nHeightPoW = pindexNew->pprev->nHeightPoW;
+            pindexNew->nHeightPoS = pindexNew->pprev->nHeightPoS + 1;
+        }
+    } else if (pindexNew->pprev) { // Increase the count of PoW blocks in the chain
+        pindexNew->nHeightPoW = pindexNew->pprev->nHeightPoW + 1;
+        pindexNew->nHeightPoS = pindexNew->pprev->nHeightPoS;
+    }
     if (IsTreasuryBlock(pindexNew->nHeight, Params().GetConsensus()))
         pindexNew->SetTreasuryBlock();
     pindexNew->nChainWork = (pindexNew->pprev ? pindexNew->pprev->nChainWork : 0) + GetBlockProof(*pindexNew);
@@ -3608,7 +3618,7 @@ static bool FindUndoPos(BlockValidationState &state, int nFile, FlatFilePos &pos
 
 static bool CheckBlockHeader(const CBlockHeader& block, BlockValidationState& state, const Consensus::Params& consensusParams, bool fCheckPOW = true)
 {
-    const int algo = CBlockHeader::GetAlgo(block.nVersion);
+    const int algo = CBlockHeader::GetAlgoType(block.nVersion);
     if ((block.nVersion >= CBlockHeader::FIRST_FORK_VERSION && algo == -1) || (block.IsProofOfStake() && block.nNonce != 0))
         return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "invalid-type", "block type is invalid");
 
@@ -3623,7 +3633,7 @@ bool CheckBlock(const CBlock& block, BlockValidationState& state, const Consensu
 {
     // These are checks that are independent of context.
     const bool IsPoS = block.IsProofOfStake();
-    LogPrint(BCLog::VALIDATION, "%s: block=%s is %s with type=%i\n", __func__, block.GetHash().ToString(), IsPoS ? "proof of stake" : "proof of work", CBlockHeader::GetAlgo(block.nVersion) == -1 ? !IsPoS : CBlockHeader::GetAlgo(block.nVersion));
+    LogPrint(BCLog::VALIDATION, "%s: block=%s is %s with type=%i\n", __func__, block.GetHash().ToString(), IsPoS ? "proof of stake" : "proof of work", CBlockHeader::GetAlgoType(block.nVersion) == -1 ? !IsPoS : CBlockHeader::GetAlgoType(block.nVersion));
 
     if (block.fChecked)
         return true;
@@ -3804,18 +3814,21 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
     // If this is a reorg and we have been synced for at least an hour, check that it is not too deep
     const int nMaxReorgDepth = gArgs.GetArg("-maxreorgdepth", DEFAULT_MAX_REORG_DEPTH);
     static int64_t nReorgCheckTime = GetTime() + 60 * 60;
-    if (nMaxReorgDepth >= 0 && GetTime() >= nReorgCheckTime && chainHeight - nHeight >= nMaxReorgDepth)
+    static bool fCheckReorgDepth = false;
+    if (!fCheckReorgDepth && GetTime() >= nReorgCheckTime)
+        fCheckReorgDepth = true;
+    if (nMaxReorgDepth >= 0 && fCheckReorgDepth && chainHeight - nHeight >= nMaxReorgDepth)
         return state.Invalid(BlockValidationResult::BLOCK_CHECKPOINT, "bad-fork-prior-to-max-reorg-depth", strprintf("%s: forked chain older than max reorganization depth (height %d, depth %d)", __func__, nHeight, chainHeight - nHeight));
 
     // Check proof of work
     const Consensus::Params& consensusParams = params.GetConsensus();
-    const unsigned int nRequiredBits = GetNextWorkRequired(pindexPrev, &block, consensusParams);
+    const uint32_t nRequiredBits = GetNextWorkRequired(pindexPrev, &block, consensusParams);
     //LogPrintf("%s: block %i - bnTarget = %s, expected bnTarget = %s\n", __func__, nHeight, arith_uint256().SetCompact(block.nBits).ToString(), arith_uint256().SetCompact(nRequiredBits).ToString());
     if (block.nBits != nRequiredBits)
         return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "bad-diffbits", "incorrect difficulty target");
 
     // Reject new PoW algorithms until they have been activated
-    if (nHeight >= 1 && CBlockHeader::GetAlgo(block.nVersion) > CBlockHeader::ALGO_POW_SHA256)
+    if (nHeight < 1 && CBlockHeader::GetAlgoType(block.nVersion) > CBlockHeader::AlgoType::ALGO_POW_SHA256)
         return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "new-algo", "block using new algo before activation");
 
     // Check against checkpoints
@@ -3839,7 +3852,7 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
         return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "invalid-time-mask", "block timestamp mask not valid");
 
     // Check timestamp
-    const unsigned int nFutureTimeLimit = MAX_FUTURE_BLOCK_TIME; // block.nVersion >= CBlockHeader::FIRST_FORK_VERSION ? MAX_FUTURE_BLOCK_TIME : 180;
+    const uint32_t nFutureTimeLimit = MAX_FUTURE_BLOCK_TIME; // block.nVersion >= CBlockHeader::FIRST_FORK_VERSION ? MAX_FUTURE_BLOCK_TIME : 180;
     if (block.GetBlockTime() > nAdjustedTime + nFutureTimeLimit && Params().NetworkIDString() != CBaseChainParams::REGTEST)
         return state.Invalid(BlockValidationResult::BLOCK_TIME_FUTURE, "time-too-new", "block timestamp too far in the future");
 
@@ -4521,10 +4534,10 @@ bool BlockManager::LoadBlockIndex(
             pindexBestHeader = pindex;
 
         // peercoin: calculate stake modifier checksum
-        //pindex->nStakeModifierChecksum = GetStakeModifierChecksum(pindex);
-        //if (::ChainActive().Contains(pindex))
-            //if (!CheckStakeModifierCheckpoints(pindex->nHeight, pindex->nStakeModifierChecksum))
-                //return error("LoadBlockIndex() : Failed stake modifier checkpoint height=%d, modifier=0x%016llx", pindex->nHeight, pindex->nStakeModifier);
+        pindex->nStakeModifierChecksum = GetStakeModifierChecksum(pindex);
+        if (::ChainActive().Contains(pindex))
+            if (!CheckStakeModifierCheckpoints(pindex->nHeight, pindex->nStakeModifierChecksum))
+                return error("LoadBlockIndex() : Failed stake modifier checkpoint height=%d, modifier=0x%016llx", pindex->nHeight, pindex->nStakeModifier);
     }
 
     return true;
@@ -5814,6 +5827,14 @@ bool CheckBlockSignature(const CBlock& block)
             if ((pubkeyStart + CPubKey::COMPRESSED_SIZE) > txin.scriptSig.size() || txin.scriptSig[pubkeyStart-1] < CPubKey::COMPRESSED_SIZE) // last pushdata must be large enough to at least hold a compressed pubkey
                 return error("%s : p2pkh txin.scriptSig.size() = %u is too small", __func__, txin.scriptSig.size());
             pubkey = CPubKey(txin.scriptSig.begin()+pubkeyStart, txin.scriptSig.end());
+        } else if ((fProofOfStake && block.vtx[1]->vout.size() > 2) || (!fProofOfStake && block.vtx[0]->vout.size() > 1)) { // check for pubkey in OP_RETURN output - this can be any arbitrary pubkey as it will be covered by the coinstake TX signature hash
+            for (const CTxOut& out : block.vtx[fProofOfStake]->vout) {
+                if (out.scriptPubKey.size() == 35 && out.scriptPubKey[0] == OP_RETURN && out.scriptPubKey[1] == CPubKey::COMPRESSED_SIZE) { // output of CScript() << OP_RETURN << ToByteVector(signingPubKey)
+                    //LogPrintf("%s : OP_RETURN out.scriptPubKey = %s\n", __func__, HexStr(out.scriptPubKey));
+                    //LogPrintf("%s : out.scriptPubKey.size() = %u\n", __func__, out.scriptPubKey.size());
+                    pubkey = CPubKey(out.scriptPubKey.begin()+2, out.scriptPubKey.end()); // skip OP_RETURN and pushdata length byte
+                }
+            }
         } else if (cbtxin.scriptSig.size() > CPubKey::COMPRESSED_SIZE && cbtxin.scriptSig[cbtxin.scriptSig.size()-CPubKey::COMPRESSED_SIZE-1] == CPubKey::COMPRESSED_SIZE) { // check for pubkey in coinbase
             //std::vector<unsigned char> vchPubKey(cbtxin.scriptSig.end()-CPubKey::COMPRESSED_SIZE, cbtxin.scriptSig.end());
             //LogPrintf("%s : coinbase cbtxin.scriptSig = %s\n", __func__, HexStr(cbtxin.scriptSig));
@@ -5829,14 +5850,6 @@ bool CheckBlockSignature(const CBlock& block)
                 }
             } else
                 return error("%s : unable to verify pubkey belongs to first output of type=%s", __func__, GetTxnOutputType(whichType));
-        } else if ((fProofOfStake && block.vtx[1]->vout.size() > 2) || (!fProofOfStake && block.vtx[0]->vout.size() > 1)) { // check for pubkey in OP_RETURN output - this can be any arbitrary pubkey as it will be covered by the coinstake TX signature hash
-            for (const CTxOut& out : block.vtx[fProofOfStake]->vout) {
-                if (out.scriptPubKey.size() == 35 && out.scriptPubKey[0] == OP_RETURN && out.scriptPubKey[1] == CPubKey::COMPRESSED_SIZE) { // output of CScript() << OP_RETURN << ToByteVector(signingPubKey)
-                    //LogPrintf("%s : OP_RETURN out.scriptPubKey = %s\n", __func__, HexStr(out.scriptPubKey));
-                    //LogPrintf("%s : out.scriptPubKey.size() = %u\n", __func__, out.scriptPubKey.size());
-                    pubkey = CPubKey(out.scriptPubKey.begin()+2, out.scriptPubKey.end()); // skip OP_RETURN and pushdata length byte
-                }
-            }
         } else { // we don't know where the pubkey is or how to parse it
             return error("%s : unable to find pubkey to validate block signature", __func__);
         }
