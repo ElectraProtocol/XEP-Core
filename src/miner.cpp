@@ -247,7 +247,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     m_last_block_weight = nBlockWeight;
 
     if (!fProofOfStake) {
-        coinbaseTx.vout[0].nValue = GetBlockSubsidy(nHeight, false, 0, consensusParams) + (chainparams.NetworkIDString() != CBaseChainParams::MAIN ? nFees / 2 : 0);
+        coinbaseTx.vout[0].nValue = GetBlockSubsidy(nHeight, false, 0, pindexPrev->nMoneySupply, consensusParams) + (chainparams.NetworkIDString() != CBaseChainParams::MAIN ? nFees / 2 : 0);
         FillTreasuryPayee(coinbaseTx, nHeight, consensusParams);
     }
     coinbaseTx.vin[0].scriptSig = CScript() << nHeight << OP_0;
@@ -730,7 +730,7 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, const std
                 if (!GetCoinAge((const CTransaction)coinstakeTx, view, pblock->nTime, nHeight, nCoinAge))
                     return error("%s : failed to calculate coin age", __func__);
 
-                const CAmount nReward = GetBlockSubsidy(nHeight, true, nCoinAge, consensusParams) + (Params().NetworkIDString() != CBaseChainParams::MAIN ? nFees / 2 : 0);
+                const CAmount nReward = GetBlockSubsidy(nHeight, true, nCoinAge, pindexPrev->nMoneySupply, consensusParams) + (Params().NetworkIDString() != CBaseChainParams::MAIN ? nFees / 2 : 0);
                 // Refuse to create mint that has zero or negative reward
                 if (nReward < 0)
                     return error("%s : not creating mint with negative subsidy", __func__);

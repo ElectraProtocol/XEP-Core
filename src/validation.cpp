@@ -1271,13 +1271,12 @@ bool ReadRawBlockFromDisk(std::vector<uint8_t>& block, const CBlockIndex* pindex
     return ReadRawBlockFromDisk(block, block_pos, message_start);
 }
 
-CAmount GetBlockSubsidy(int nHeight, bool fProofOfStake, uint64_t nCoinAge, const Consensus::Params& consensusParams, bool fSuperblockPartOnly)
+CAmount GetBlockSubsidy(int nHeight, bool fProofOfStake, uint64_t nCoinAge, CAmount nMoneySupplyPrev, const Consensus::Params& consensusParams, bool fSuperblockPartOnly)
 {
     if (nHeight < 0) return 0;
 
     CAmount nSubsidy = 0;
     CAmount nRewardCoinYear = COIN / 100; // this is 1% APR interest by default (compounded once per stake); for every 100 coins held for a year, the reward when staked should be 1 coin (rewards increase proportionally with larger money supply/more coins staking)
-    const CAmount nMoneySupply = (nHeight > 0 && ::ChainActive().Tip()) ? (::ChainActive()[nHeight-1] ? ::ChainActive()[nHeight-1]->nMoneySupply : ::ChainActive().Tip()->nMoneySupply) : 0; // the previous block's money supply should probably be passed to this function instead of retrieving it here
 
     if (fProofOfStake) {
         nRewardCoinYear *= 3; // 3% interest (effective rate with continuous compounding is exp(0.03) - 1 = 3.045%)
@@ -1293,7 +1292,7 @@ CAmount GetBlockSubsidy(int nHeight, bool fProofOfStake, uint64_t nCoinAge, cons
     }
 
     if ((unsigned)nHeight >= consensusParams.nMinerConfirmationWindow) {
-        if (nMoneySupply + nSubsidy > MAX_MONEY) // soft supply cap (this will essentially put us into static PoW/PoS rewards)
+        if (nMoneySupplyPrev + nSubsidy > MAX_MONEY) // soft supply cap (this will essentially put us into static PoW/PoS rewards)
             nSubsidy = std::min(nSubsidy, 100 * COIN);
     }
 
@@ -1334,7 +1333,7 @@ CAmount GetTreasuryPayment(int nHeight, const Consensus::Params& consensusParams
                     ReadBlockFromDisk(block, pindex, consensusParams);
                     GetCoinAge(*block.vtx[1], ::ChainstateActive().CoinsTip(), block.nTime, i, nCoinAge);
                 }
-                blockValue += GetBlockSubsidy(i, pindex->IsProofOfStake(), nCoinAge, consensusParams, false);*/
+                blockValue += GetBlockSubsidy(i, pindex->IsProofOfStake(), nCoinAge, pindex->pprev ? pindex->pprev->nMoneySupply : 0, consensusParams, false);*/
                 blockValue += pindex->nMint - pindex->nTreasuryPayment;
             }
         }
@@ -2435,7 +2434,8 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
     LogPrint(BCLog::BENCH, "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs (%.2fms/blk)]\n", (unsigned)block.vtx.size(), MILLI * (nTime3 - nTime2), MILLI * (nTime3 - nTime2) / block.vtx.size(), nInputs <= 1 ? 0 : MILLI * (nTime3 - nTime2) / (nInputs-1), nTimeConnect * MICRO, nTimeConnect * MILLI / nBlocksTotal);
 
     const CAmount nActualBlockReward = nFees + nValueOut - nValueIn;
-    CAmount nExpectedBlockReward = GetBlockSubsidy(pindex->nHeight, fProofOfStake, nCoinAge, chainparams.GetConsensus());
+    const CAmount nMoneySupplyPrev = pindex->pprev ? pindex->pprev->nMoneySupply : 0;
+    CAmount nExpectedBlockReward = GetBlockSubsidy(pindex->nHeight, fProofOfStake, nCoinAge, nMoneySupplyPrev, chainparams.GetConsensus());
     CAmount nTreasuryPayment = GetTreasuryPayment(pindex->nHeight, chainparams.GetConsensus());
 
     if (chainparams.NetworkIDString() != CBaseChainParams::MAIN) { // Half of fees are burned on and after the first PoS block
@@ -2482,7 +2482,7 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
 
     // peercoin: track money supply and mint amount info
     pindex->nMint = nActualBlockReward;
-    pindex->nMoneySupply = (pindex->pprev ? pindex->pprev->nMoneySupply : 0) + pindex->nMint - nAmountBurned - nFees; // Fees are not added to nMoneySupply because they are already part of the circulating supply
+    pindex->nMoneySupply = nMoneySupplyPrev + pindex->nMint - nAmountBurned - nFees; // Fees are not added to nMoneySupply because they are already part of the circulating supply
     pindex->nTreasuryPayment = nTreasuryPayment;
     //LogPrintf("ConnectBlock(): INFO: nValueOut: %s, nValueIn: %s, nFees: %s, nMint: %s\n", FormatMoney(nValueOut), FormatMoney(nValueIn), FormatMoney(nFees), FormatMoney(pindex->nMint));
 
