@@ -606,7 +606,7 @@ SigningResult LegacyScriptPubKeyMan::SignBlock(CBlock& block, const CPubKey& pub
         return SigningResult::PRIVATE_KEY_NOT_AVAILABLE;
     }
 
-    if (key.Sign(block.GetHash(), block.vchBlockSig)) {
+    if (key.SignCompact(block.GetHash(), block.vchBlockSig, CPubKey::SigFlag::VERSION_SIG_COMPACT)) {
         return SigningResult::OK;
     }
     return SigningResult::SIGNING_FAILED;
@@ -2127,7 +2127,7 @@ SigningResult DescriptorScriptPubKeyMan::SignBlock(CBlock& block, const CPubKey&
         return SigningResult::PRIVATE_KEY_NOT_AVAILABLE;
     }
 
-    if (!key.Sign(block.GetHash(), block.vchBlockSig)) {
+    if (!key.SignCompact(block.GetHash(), block.vchBlockSig, CPubKey::SigFlag::VERSION_SIG_COMPACT)) {
         return SigningResult::SIGNING_FAILED;
     }
     return SigningResult::OK;
