@@ -183,11 +183,13 @@ void UpdateWalletDialog::checkForUpdate()
 void UpdateWalletDialog::gotReply()
 {
     if (reply) {
+        // Data format: {json}:(signature)
+        // This ensures that the current version data has not been tampered with
         QByteArray response_data = reply->readAll();
         delete reply;
         QByteArray signature = response_data;
         const int jsonEnd = signature.lastIndexOf("}:(");
-        if (jsonEnd > -1) {
+        if (jsonEnd > -1 && signature.endsWith(')')) {
             signature.remove(0, jsonEnd + 3).chop(1);
             response_data.remove(jsonEnd + 1, response_data.size() - 1);
 
