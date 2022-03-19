@@ -198,6 +198,7 @@ UniValue blockToJSON(const CBlock& block, const CBlockIndex* tip, const CBlockIn
 
     if (blockindex->IsProofOfStake()) {
         result.pushKV("proof", "stake");
+        result.pushKV("signature", HexStr(block.vchBlockSig));
 
         UniValue stakeData(UniValue::VOBJ);
         stakeData.pushKV("proofhash", blockindex->hashProofOfStake.GetHex());
