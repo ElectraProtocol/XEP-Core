@@ -399,6 +399,7 @@ void XEPGUI::createActions()
     connect(openRPCConsoleAction, &QAction::triggered, this, &XEPGUI::showDebugWindow);
     // prevents an open debug or appLocker window from becoming stuck/unusable on client shutdown
     connect(quitAction, &QAction::triggered, rpcConsole, &QWidget::hide);
+    connect(quitAction, &QAction::triggered, updateWalletDialog, &QWidget::close);
     connect(quitAction, &QAction::triggered, appLocker, &QWidget::close);
 
     websiteLinkAction = new QAction(tr("Electra Protocol Website"), this);
@@ -1458,6 +1459,8 @@ void XEPGUI::detectShutdown()
     {
         if(rpcConsole)
             rpcConsole->hide();
+        if (updateWalletDialog)
+            updateWalletDialog->close();
         if (appLocker) {
             if (appLocker->isWalletLocked()) {
                 appLocker->forceShutdown();

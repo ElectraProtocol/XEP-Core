@@ -158,6 +158,7 @@ UpdateWalletDialog::UpdateWalletDialog(QWidget *parent) :
     connect(this, &QDialog::rejected, [this]{ on_okButton_accepted(); });
 
     setWindowTitle(tr("%1 update available").arg(PACKAGE_NAME));
+    setWindowModality(Qt::ApplicationModal);
 
     ui->aboutMessage->setTextFormat(Qt::RichText);
     ui->scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
@@ -188,7 +189,7 @@ void UpdateWalletDialog::gotReply()
     // Data format: {json}:(signature)
     // This ensures that the current version data has not been tampered with
     QByteArray response_data = reply->readAll();
-    delete reply;
+    reply->deleteLater();
     QByteArray signature = response_data;
     const int jsonEnd = signature.lastIndexOf("}:(");
 
@@ -262,7 +263,7 @@ void UpdateWalletDialog::gotReply()
         return;
 
     ui->aboutMessage->setText(getUpdateString());
-    exec();
+    show();
 }
 
 QString UpdateWalletDialog::getUpdateString()
