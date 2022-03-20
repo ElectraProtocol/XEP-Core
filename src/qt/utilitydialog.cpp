@@ -186,49 +186,79 @@ void UpdateWalletDialog::gotReply()
     if (!reply)
         return;
 
-    // Data format: {json}:(signature)
-    // This ensures that the current version data has not been tampered with
-    QByteArray response_data = reply->readAll();
+    // Data format:
+    /*
+    {
+        "version_message":{
+            "version_major":1,
+            "version_minor":0,
+            "version_revision":4,
+            "version_build":0,
+            "version_rc":0,
+            "mandatory":false,
+            "last_mandatory":{
+                "version_major":1,
+                "version_minor":0,
+                "version_revision":3,
+                "version_build":0,
+                "version_rc":0
+            }
+        },
+        "signature_base64":"IFEIcNVlQZ5TzzoQMI5Pa40NPNzK4jomkvRJE3OIpv9hEUorgTiNnXTQgpsgzUMPkHATErH7sWPJmt22Z8ymZ7Q="
+    }
+    */
+    // The message signature ensures that the current version data has not been tampered with
+
+    const QByteArray response_data = reply->readAll();
     reply->deleteLater();
-    QByteArray signature = response_data;
-    const int jsonEnd = signature.lastIndexOf("}:(");
 
-    if (jsonEnd == -1 || !signature.endsWith(')'))
-        return;
-
-    // Split json and signature
-    signature.remove(0, jsonEnd + 3).chop(1);
-    response_data.remove(jsonEnd + 1, response_data.size() - 1);
-
-    const std::string signingAddr = EncodeDestination(PKHash(uint160(ParseHex(SIGNING_ADDR_HEX))));
-
-    // Check signature
-    if (MessageVerify(signingAddr, signature.toStdString(), response_data.toStdString()) != MessageVerificationResult::OK)
-        return;
-
-    const QJsonDocument jsonAnswer = QJsonDocument::fromJson(response_data);
+    // Ensure json is in compact format for signature check
+    const QByteArray compact_data = QString(response_data.simplified()).remove(QRegularExpression("(\r\n|\r|\n)|[ \t]")).toUtf8();
+    const QJsonDocument jsonAnswer = QJsonDocument::fromJson(compact_data);
 
     if (!jsonAnswer.isObject())
         return;
 
     const QJsonObject &responseObject = jsonAnswer.object();
 
+    const QString strVerMessage = "version_message";
     const QString strVerMajor = "version_major";
     const QString strVerMinor = "version_minor";
     const QString strVerRev = "version_revision";
     const QString strVerBuild = "version_build";
     const QString strVerRC = "version_rc";
     const QString strMandatory = "mandatory";
-    const QString strLastMandatory = "lastmandatory";
+    const QString strLastMandatory = "last_mandatory";
+    const QString strSignature = "signature_base64";
 
-    // Check that the json is well formatted
-    if (responseObject.size() != 7 || !responseObject[strVerMajor].isDouble() || !responseObject[strVerMinor].isDouble() ||
-        !responseObject[strVerRev].isDouble() || !responseObject[strVerBuild].isDouble() || !responseObject[strVerRC].isDouble() ||
-        !responseObject[strMandatory].isBool() || !responseObject[strLastMandatory].isObject())
+    const QString verMsgMatch = "\"" + strVerMessage + "\":";
+    const QString sigMatch = ",\"" + strSignature + "\":\"";
+    const int verMsgStart = compact_data.indexOf(verMsgMatch);
+    const int sigStart = compact_data.indexOf(sigMatch);
+
+    // Check that the json is well formatted (strVerMessage is present and comes before strSignature)
+    if (responseObject.size() != 2 || !responseObject[strVerMessage].isObject() || !responseObject[strSignature].isString() || sigStart <= verMsgStart)
         return;
 
-    const QJsonObject &lastMandatory = responseObject[strLastMandatory].toObject();
+    const QJsonObject &versionMessage = responseObject[strVerMessage].toObject();
+    const QString &versionSignature = responseObject[strSignature].toString();
+    QByteArray versionMessageCompact = compact_data;
+    versionMessageCompact.remove(0, verMsgStart + verMsgMatch.size()).chop(compact_data.size() - sigStart);
 
+    // Check signature
+    const std::string signingAddr = EncodeDestination(PKHash(uint160(ParseHex(SIGNING_ADDR_HEX))));
+    if (MessageVerify(signingAddr, versionSignature.toStdString(), versionMessageCompact.toStdString()) != MessageVerificationResult::OK)
+        return;
+
+    // Check that the json is well formatted
+    if (versionMessage.size() != 7 || !versionMessage[strVerMajor].isDouble() || !versionMessage[strVerMinor].isDouble() ||
+        !versionMessage[strVerRev].isDouble() || !versionMessage[strVerBuild].isDouble() || !versionMessage[strVerRC].isDouble() ||
+        !versionMessage[strMandatory].isBool() || !versionMessage[strLastMandatory].isObject())
+        return;
+
+    const QJsonObject &lastMandatory = versionMessage[strLastMandatory].toObject();
+
+    // Check that the json is well formatted
     if (lastMandatory.size() != 5 || !lastMandatory[strVerMajor].isDouble() || !lastMandatory[strVerMinor].isDouble() ||
         !lastMandatory[strVerRev].isDouble() || !lastMandatory[strVerBuild].isDouble() || !lastMandatory[strVerRC].isDouble())
         return;
@@ -236,11 +266,11 @@ void UpdateWalletDialog::gotReply()
     bool outdated = true;
     mandatoryUpdate = true;
 
-    newVersionMajor = responseObject[strVerMajor].toInt();
-    newVersionMinor = responseObject[strVerMinor].toInt();
-    newVersionRevision = responseObject[strVerRev].toInt();
-    newVersionBuild = responseObject[strVerBuild].toInt();
-    newVersionRC = responseObject[strVerRC].toInt();
+    newVersionMajor = versionMessage[strVerMajor].toInt();
+    newVersionMinor = versionMessage[strVerMinor].toInt();
+    newVersionRevision = versionMessage[strVerRev].toInt();
+    newVersionBuild = versionMessage[strVerBuild].toInt();
+    newVersionRC = versionMessage[strVerRC].toInt();
 
     const int lastMandatoryMajor = lastMandatory[strVerMajor].toInt();
     const int lastMandatoryMinor = lastMandatory[strVerMinor].toInt();
@@ -252,7 +282,7 @@ void UpdateWalletDialog::gotReply()
         (lastMandatoryMajor == CLIENT_VERSION_MAJOR && lastMandatoryMinor == CLIENT_VERSION_MINOR && lastMandatoryRevision < CLIENT_VERSION_REVISION) ||
         (lastMandatoryMajor == CLIENT_VERSION_MAJOR && lastMandatoryMinor == CLIENT_VERSION_MINOR && lastMandatoryRevision == CLIENT_VERSION_REVISION &&
          lastMandatoryBuild <= CLIENT_VERSION_BUILD)) {
-        mandatoryUpdate = responseObject[strMandatory].toBool();
+        mandatoryUpdate = versionMessage[strMandatory].toBool();
 
         // Are we the newest version available?
         if (newVersionMajor < CLIENT_VERSION_MAJOR || (newVersionMajor == CLIENT_VERSION_MAJOR && newVersionMinor < CLIENT_VERSION_MINOR) ||

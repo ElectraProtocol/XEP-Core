@@ -44,7 +44,7 @@ class UpdateWalletDialog : public QDialog
     Q_OBJECT
 
 public:
-    const QUrl VERSION_URL = QUrl("http://electraprotocol.eu/getlatestversionsigned");
+    const QUrl VERSION_URL = QUrl("http://electraprotocol.eu/getlatestversion");
     const std::string SIGNING_ADDR_HEX = "4030a4b91118ba1cef4e8ec02f78196f8ff83eef"; // PESag4Dpqxtwv9QW3UVVM95oPUEcjk9HJt
 
     explicit UpdateWalletDialog(QWidget *parent);
