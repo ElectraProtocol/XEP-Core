@@ -242,11 +242,16 @@ void UpdateWalletDialog::gotReply()
     newVersionBuild = responseObject[strVerBuild].toInt();
     newVersionRC = responseObject[strVerRC].toInt();
 
+    const int lastMandatoryMajor = lastMandatory[strVerMajor].toInt();
+    const int lastMandatoryMinor = lastMandatory[strVerMinor].toInt();
+    const int lastMandatoryRevision = lastMandatory[strVerRev].toInt();
+    const int lastMandatoryBuild = lastMandatory[strVerBuild].toInt();
+
     // Are we newer than the last mandatory version?
-    if (lastMandatory[strVerMajor].toInt() < CLIENT_VERSION_MAJOR || (lastMandatory[strVerMajor].toInt() == CLIENT_VERSION_MAJOR && lastMandatory[strVerMinor].toInt() < CLIENT_VERSION_MINOR) ||
-        (lastMandatory[strVerMajor].toInt() == CLIENT_VERSION_MAJOR && lastMandatory[strVerMinor].toInt() == CLIENT_VERSION_MINOR && lastMandatory[strVerRev].toInt() < CLIENT_VERSION_REVISION) ||
-        (lastMandatory[strVerMajor].toInt() == CLIENT_VERSION_MAJOR && lastMandatory[strVerMinor].toInt() == CLIENT_VERSION_MINOR && lastMandatory[strVerRev].toInt() == CLIENT_VERSION_REVISION &&
-         lastMandatory[strVerBuild].toInt() <= CLIENT_VERSION_BUILD)) {
+    if (lastMandatoryMajor < CLIENT_VERSION_MAJOR || (lastMandatoryMajor == CLIENT_VERSION_MAJOR && lastMandatoryMinor < CLIENT_VERSION_MINOR) ||
+        (lastMandatoryMajor == CLIENT_VERSION_MAJOR && lastMandatoryMinor == CLIENT_VERSION_MINOR && lastMandatoryRevision < CLIENT_VERSION_REVISION) ||
+        (lastMandatoryMajor == CLIENT_VERSION_MAJOR && lastMandatoryMinor == CLIENT_VERSION_MINOR && lastMandatoryRevision == CLIENT_VERSION_REVISION &&
+         lastMandatoryBuild <= CLIENT_VERSION_BUILD)) {
         mandatoryUpdate = responseObject[strMandatory].toBool();
 
         // Are we the newest version available?
