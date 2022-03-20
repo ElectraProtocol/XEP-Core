@@ -5,14 +5,6 @@
 #ifndef APPLOCKER_H
 #define APPLOCKER_H
 
-#include <QCloseEvent>
-#include <QDateTime>
-#include <QDesktopWidget>
-#include <QMessageBox>
-//#include <QPasswordDigestor>
-#include <QPushButton>
-#include <QRegExpValidator>
-#include <QScreen>
 #include <QWidget>
 
 QT_BEGIN_NAMESPACE
