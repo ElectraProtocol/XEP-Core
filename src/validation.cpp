@@ -1299,8 +1299,8 @@ CAmount GetBlockSubsidy(int nHeight, bool fProofOfStake, uint64_t nCoinAge, CAmo
     // 10% of reward goes to governance/treasury (90/100 goes to stakers and MNs)
     CAmount nSuperblockPart = 0;
     if (nHeight >= consensusParams.nTreasuryPaymentsStartBlock || nHeight >= consensusParams.nBudgetPaymentsStartBlock) {
-        nSuperblockPart = nSubsidy * consensusParams.nTreasuryRewardPercentage / 100;
-        nSubsidy = nSubsidy * std::max(100 - consensusParams.nTreasuryRewardPercentage, 1u) / 100;
+        nSuperblockPart = nSubsidy * consensusParams.nTreasuryRewardPercentage / 100; // 10%
+        nSubsidy = nSubsidy * std::max(100 - consensusParams.nTreasuryRewardPercentage, 1u) / 100; // 90%
     }
 
     return fSuperblockPartOnly ? nSuperblockPart : nSubsidy;
@@ -1316,28 +1316,19 @@ static inline bool IsTreasuryBlock(int nHeight, const Consensus::Params& consens
         return false;
 }
 
-CAmount GetTreasuryPayment(int nHeight, const Consensus::Params& consensusParams)
+CAmount GetTreasuryPayment(const CBlockIndex* pindexPrev, const Consensus::Params& consensusParams)
 {
-    if (IsTreasuryBlock(nHeight, consensusParams)) {
-        int startHeight = std::max(nHeight - consensusParams.nTreasuryPaymentsCycleBlocks, 0);
+    if (pindexPrev && IsTreasuryBlock(pindexPrev->nHeight + 1, consensusParams)) {
         CAmount blockValue = 0;
 
-        for (int i = startHeight; i < nHeight; i++) {
-            const CBlockIndex* const pindex = ::ChainActive()[i];
-            if (!IsTreasuryBlock(i, consensusParams)) // make sure previous treasury rewards aren't counted
-                blockValue += pindex->nMint; // add up coins from previous nTreasuryPaymentsCycleBlocks blocks
-            else {
-                /*uint64_t nCoinAge = 0;
-                if (pindex->IsProofOfStake()) {
-                    CBlock block;
-                    ReadBlockFromDisk(block, pindex, consensusParams);
-                    GetCoinAge(*block.vtx[1], ::ChainstateActive().CoinsTip(), block.nTime, i, nCoinAge);
-                }
-                blockValue += GetBlockSubsidy(i, pindex->IsProofOfStake(), nCoinAge, pindex->pprev ? pindex->pprev->nMoneySupply : 0, consensusParams, false);*/
-                blockValue += pindex->nMint - pindex->nTreasuryPayment;
-            }
+        for (int i = 0; pindexPrev && i < consensusParams.nTreasuryPaymentsCycleBlocks; i++) {
+            blockValue += pindexPrev->nMint - pindexPrev->nTreasuryPayment;
+
+            pindexPrev = pindexPrev->pprev;
         }
-        return blockValue * consensusParams.nTreasuryRewardPercentage / std::max(100 - consensusParams.nTreasuryRewardPercentage, 1u); // 10% of block value paid to treasury
+
+        // 10% of block value paid to treasury (we divide by 90 instead of 100 because blockValue only represents 90% of the total block reward)
+        return blockValue * consensusParams.nTreasuryRewardPercentage / std::max(100 - consensusParams.nTreasuryRewardPercentage, 1u);
     } else {
         return 0;
     }
@@ -2436,13 +2427,13 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
     const CAmount nActualBlockReward = nFees + nValueOut - nValueIn;
     const CAmount nMoneySupplyPrev = pindex->pprev ? pindex->pprev->nMoneySupply : 0;
     CAmount nExpectedBlockReward = GetBlockSubsidy(pindex->nHeight, fProofOfStake, nCoinAge, nMoneySupplyPrev, chainparams.GetConsensus());
-    CAmount nTreasuryPayment = GetTreasuryPayment(pindex->nHeight, chainparams.GetConsensus());
+    CAmount nTreasuryPayment = GetTreasuryPayment(pindex->pprev, chainparams.GetConsensus());
 
     if (chainparams.NetworkIDString() != CBaseChainParams::MAIN) { // Half of fees are burned on and after the first PoS block
         nExpectedBlockReward += nFees / 2;
     }
 
-    if (nTreasuryPayment > 0 && IsTreasuryBlock(pindex->nHeight, chainparams.GetConsensus())) {
+    if (nTreasuryPayment > 0) {
         const CTransaction& txNew = fProofOfStake ? *block.vtx[1] : *block.vtx[0];
         const std::map<CScript, unsigned int>& treasuryPayees = chainparams.GetConsensus().mTreasuryPayees;
         CAmount nActualTreasuryPayment = 0;

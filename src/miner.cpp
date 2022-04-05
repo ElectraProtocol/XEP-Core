@@ -119,9 +119,9 @@ void BlockAssembler::resetBlock()
     nFees = 0;
 }
 
-static inline void FillTreasuryPayee(CMutableTransaction& txNew, const int nHeight, const Consensus::Params& consensusParams)
+static inline void FillTreasuryPayee(CMutableTransaction& txNew, const CBlockIndex* pindexPrev, const Consensus::Params& consensusParams)
 {
-    const CAmount nTreasuryPayment = GetTreasuryPayment(nHeight, consensusParams);
+    const CAmount nTreasuryPayment = GetTreasuryPayment(pindexPrev, consensusParams);
 
     if (nTreasuryPayment > 0) {
         const std::map<CScript, unsigned int>& treasuryPayees = consensusParams.mTreasuryPayees;
@@ -248,7 +248,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
 
     if (!fProofOfStake) {
         coinbaseTx.vout[0].nValue = GetBlockSubsidy(nHeight, false, 0, pindexPrev->nMoneySupply, consensusParams) + (chainparams.NetworkIDString() != CBaseChainParams::MAIN ? nFees / 2 : 0);
-        FillTreasuryPayee(coinbaseTx, nHeight, consensusParams);
+        FillTreasuryPayee(coinbaseTx, pindexPrev, consensusParams);
     }
     coinbaseTx.vin[0].scriptSig = CScript() << nHeight << OP_0;
     pblocktemplate->entries[0].tx = MakeTransactionRef(std::move(coinbaseTx));
@@ -762,7 +762,7 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, const std
                 }
 
                 // Add treasury payment
-                FillTreasuryPayee(coinstakeTx, nHeight, consensusParams);
+                FillTreasuryPayee(coinstakeTx, pindexPrev, consensusParams);
 
                 // Sign
                 if (!pwallet->SignTransaction(coinstakeTx))
