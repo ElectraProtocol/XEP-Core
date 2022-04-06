@@ -2368,7 +2368,7 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
                 LogPrintf("ERROR: %s: accumulated fee in the block out of range.\n", __func__);
                 return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-txns-accumulated-fee-outofrange");
             }
-            if (tx.IsCoinStake() && !GetCoinAge(tx, view, block.nTime, pindex->nHeight, nCoinAge))
+            if (tx.IsCoinStake() && !GetCoinAge(tx, view, m_chain, block.nTime, pindex->nHeight, nCoinAge))
                 return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-txns-coinage", strprintf("%s: unable to get coin age for coinstake %s", __func__, tx.GetHash().ToString()));
 
             // Check that transaction is BIP68 final
@@ -5722,7 +5722,7 @@ void ChainstateManager::MaybeRebalanceCaches()
 // guaranteed to be in main chain by sync-checkpoint. This rule is
 // introduced to help nodes establish a consistent view of the coin
 // age (trust score) of competing branches.
-bool GetCoinAge(const CTransaction& tx, const CCoinsViewCache& view, unsigned int nTimeTx, int nHeightCurrent, uint64_t& nCoinAge, const CBlockIndex* pindexFrom)
+bool GetCoinAge(const CTransaction& tx, const CCoinsViewCache& view, const CChain& active_chain, unsigned int nTimeTx, int nHeightCurrent, uint64_t& nCoinAge, const CBlockIndex* pindexFrom)
 {
     arith_uint256 bnSatoshiSecond = 0;  // coin age in the unit of satoshi-seconds
     nCoinAge = 0;
@@ -5739,7 +5739,7 @@ bool GetCoinAge(const CTransaction& tx, const CCoinsViewCache& view, unsigned in
         int64_t nValueIn;
         //uint32_t nTimeTxPrev;
         if (view.GetCoin(prevout, coin)) {
-            pindexFrom = ::ChainActive()[coin.nHeight];
+            pindexFrom = active_chain[coin.nHeight];
             nValueIn = coin.out.nValue;
             //nTimeTxPrev = coin.nTime;
         } else {

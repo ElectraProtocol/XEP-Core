@@ -981,7 +981,7 @@ bool DumpMempool(const CTxMemPool& pool);
 bool LoadMempool(CTxMemPool& pool);
 
 // peercoin:
-bool GetCoinAge(const CTransaction& tx, const CCoinsViewCache& view, unsigned int nTimeTx, int nHeightCurrent, uint64_t& nCoinAge, const CBlockIndex* pindexFrom = nullptr); // peercoin: get transaction coin age
+bool GetCoinAge(const CTransaction& tx, const CCoinsViewCache& view, const CChain& active_chain, unsigned int nTimeTx, int nHeightCurrent, uint64_t& nCoinAge, const CBlockIndex* pindexFrom = nullptr); // peercoin: get transaction coin age
 bool CheckBlockSignature(const CBlock& block);
 
 //! Check whether the block associated with this index entry is pruned or not.

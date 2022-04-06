@@ -727,7 +727,7 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, const std
                     LogPrintf("%s : added kernel type=%s\n", __func__, GetTxnOutputType(whichType));
 
                 uint64_t nCoinAge = 0;
-                if (!GetCoinAge((const CTransaction)coinstakeTx, view, pblock->nTime, nHeight, nCoinAge))
+                if (!GetCoinAge((const CTransaction)coinstakeTx, view, ::ChainActive(), pblock->nTime, nHeight, nCoinAge))
                     return error("%s : failed to calculate coin age", __func__);
 
                 const CAmount nReward = GetBlockSubsidy(nHeight, true, nCoinAge, pindexPrev->nMoneySupply, consensusParams) + (Params().NetworkIDString() != CBaseChainParams::MAIN ? nFees / 2 : 0);
