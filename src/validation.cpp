@@ -4526,9 +4526,6 @@ bool BlockManager::LoadBlockIndex(
 
         // peercoin: calculate stake modifier checksum
         pindex->nStakeModifierChecksum = GetStakeModifierChecksum(pindex);
-        if (::ChainActive().Contains(pindex))
-            if (!CheckStakeModifierCheckpoints(pindex->nHeight, pindex->nStakeModifierChecksum))
-                return error("LoadBlockIndex() : Failed stake modifier checkpoint height=%d, modifier=0x%016llx", pindex->nHeight, pindex->nStakeModifier);
     }
 
     return true;
