@@ -2034,11 +2034,11 @@ static unsigned int GetBlockScriptFlags(const CBlockIndex* pindex, const Consens
 }
 
 // These checks can only be done when all previous blocks have been added.
-static inline bool ContextualCheckPoSBlock(const CBlock& block, const bool& fProofOfStake, BlockValidationState& state, const CCoinsViewCache& view, CBlockIndex* pindex, const Consensus::Params& params, bool fJustCheck)
+static inline bool ContextualCheckPoSBlock(const CBlock& block, const bool& fProofOfStake, BlockValidationState& state, const CCoinsViewCache& view, const CChain& active_chain, CBlockIndex* pindex, const Consensus::Params& params, bool fJustCheck)
 {
     uint256 hashProofOfStake = uint256();
     // peercoin: verify hash target and signature of coinstake tx
-    if (fProofOfStake && !CheckProofOfStake(state, view, pindex->pprev, block.vtx[1], block.nBits, block.nTime, hashProofOfStake)) {
+    if (fProofOfStake && !CheckProofOfStake(state, view, active_chain, pindex->pprev, block.vtx[1], block.nBits, block.nTime, hashProofOfStake)) {
         LogPrintf("WARNING: %s: check proof-of-stake failed for block %s\n", __func__, pindex->GetBlockHash().ToString());
         return false; // do not error here as we expect this during initial block download
     }
@@ -2183,7 +2183,7 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
     else if (!fProofOfStake && pindex->nHeight > chainparams.GetConsensus().nLastPoWBlock)
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "PoW-ended", strprintf("%s: PoW period ended", __func__));
 
-    if (!pindex->GeneratedStakeModifier() && /*pindex->nStakeModifierChecksum == 0 &&*/ !ContextualCheckPoSBlock(block, fProofOfStake, state, view, pindex, chainparams.GetConsensus(), fJustCheck))
+    if (!pindex->GeneratedStakeModifier() && /*pindex->nStakeModifierChecksum == 0 &&*/ !ContextualCheckPoSBlock(block, fProofOfStake, state, view, m_chain, pindex, chainparams.GetConsensus(), fJustCheck))
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-pos", "proof of stake is incorrect"); // return invalid state here because we don't check in AcceptBlock
         //return error("%s: failed PoS check %s", __func__, state.ToString());
 
@@ -4184,7 +4184,7 @@ bool CChainState::AcceptBlock(const std::shared_ptr<const CBlock>& pblock, Block
     }
 
     // peercoin: check PoS
-    if (fCheckPoS && !ContextualCheckPoSBlock(block, block.IsProofOfStake(), state, CoinsTip(), pindex, chainparams.GetConsensus(), false)) {
+    if (fCheckPoS && !ContextualCheckPoSBlock(block, block.IsProofOfStake(), state, CoinsTip(), m_chain, pindex, chainparams.GetConsensus(), false)) {
         pindex->nStatus |= BLOCK_FAILED_VALID;
         setDirtyBlockIndex.insert(pindex);
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-pos", "proof of stake is incorrect");

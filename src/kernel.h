@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2020 The Peercoin developers
 // Copyright (c) 2015-2019 The PIVX developers
-// Copyright (c) 2018-2021 John "ComputerCraftr" Studnicka
+// Copyright (c) 2018-2022 John "ComputerCraftr" Studnicka
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -16,6 +16,7 @@ class CBlockIndex;
 class BlockValidationState;
 class CBlockHeader;
 class CBlock;
+class CChain;
 
 
 // MODIFIER_INTERVAL_RATIO:
@@ -35,7 +36,7 @@ bool CheckStakeKernelHash(const unsigned int& nBits, const CBlockIndex* pindexPr
 
 // Check kernel hash target and coinstake signature
 // Sets hashProofOfStake on success return
-bool CheckProofOfStake(BlockValidationState& state, const CCoinsViewCache& view, const CBlockIndex* pindexPrev, const CTransactionRef& tx, const unsigned int& nBits, unsigned int nTimeTx, uint256& hashProofOfStake);
+bool CheckProofOfStake(BlockValidationState& state, const CCoinsViewCache& view, const CChain& active_chain, const CBlockIndex* pindexPrev, const CTransactionRef& tx, const unsigned int& nBits, unsigned int nTimeTx, uint256& hashProofOfStake);
 
 // Check whether the coinstake timestamp meets protocol
 bool CheckCoinStakeTimestamp(int64_t nTimeBlock, int64_t nTimeTx);
