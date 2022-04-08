@@ -574,15 +574,10 @@ bool CheckStakeKernelHash(const unsigned int& nBits, const CBlockIndex* pindexPr
     // nHashDrift should be <= MAX_FUTURE_BLOCK_TIME otherwise we risk creating a block which will be rejected due to nTimeTx being too far in the future
     bool fSuccess = false;
     unsigned int nTryTime = 0;
-    const int nHeightStart = nHeightCurrent - 1;
     const int iteration = params.nStakeTimestampMask + 1; // 16 second time slots for 0xf masked time
     assert((nHashDrift & params.nStakeTimestampMask) == 0);
     for (int i = nHashDrift; i >= 0; i -= iteration) //iterate the hashing
     {
-        // New block came in, move on
-        if (::ChainActive().Height() != nHeightStart)
-            break;
-
         // Hash this iteration - start at nHashDrift and work backwards to nTimeTx
         nTryTime = nTimeTx + i; //nTimeTx + nHashDrift - i;
         hashProofOfStake = stakeHash(nTryTime, ss, prevout.n, prevout.hash, nTimeBlockFrom, true);

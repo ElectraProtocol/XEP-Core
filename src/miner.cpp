@@ -565,9 +565,6 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, const std
         CAmount nCredit = 0;
         CScript scriptPubKeyKernel;
         for (const auto& pcoin : setCoins) {
-            if (::ChainActive().Height() != pindexPrev->nHeight)
-                break;
-
             CCoinsViewCache view(&::ChainstateActive().CoinsTip());
             const COutPoint& prevout = pcoin.outpoint;
             Coin coin;
