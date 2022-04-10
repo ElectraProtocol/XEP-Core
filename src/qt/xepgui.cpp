@@ -420,12 +420,12 @@ void XEPGUI::createActions()
     coingeckoLinkAction = new QAction(tr("CoinGecko"), this);
     coingeckoLinkAction->setStatusTip("https://www.coingecko.com/en/coins/electra-protocol");
 
-    connect(websiteLinkAction, &QAction::triggered, [this]{ QDesktopServices::openUrl(QUrl("https://www.electraprotocol.com/")); });
-    connect(githubLinkAction, &QAction::triggered, [this]{ QDesktopServices::openUrl(QUrl("https://github.com/ElectraProtocol/XEP-Core")); });
-    connect(explorerOneAction, &QAction::triggered, [this]{ QDesktopServices::openUrl(QUrl("https://explorer.electraprotocol.network/")); });
-    connect(explorerTwoAction, &QAction::triggered, [this]{ QDesktopServices::openUrl(QUrl("https://electraprotocol.network/")); });
-    connect(cmcLinkAction, &QAction::triggered, [this]{ QDesktopServices::openUrl(QUrl("https://coinmarketcap.com/currencies/electra-protocol/")); });
-    connect(coingeckoLinkAction, &QAction::triggered, [this]{ QDesktopServices::openUrl(QUrl("https://www.coingecko.com/en/coins/electra-protocol")); });
+    connect(websiteLinkAction, &QAction::triggered, []{ QDesktopServices::openUrl(QUrl("https://www.electraprotocol.com/")); });
+    connect(githubLinkAction, &QAction::triggered, []{ QDesktopServices::openUrl(QUrl("https://github.com/ElectraProtocol/XEP-Core")); });
+    connect(explorerOneAction, &QAction::triggered, []{ QDesktopServices::openUrl(QUrl("https://explorer.electraprotocol.network/")); });
+    connect(explorerTwoAction, &QAction::triggered, []{ QDesktopServices::openUrl(QUrl("https://electraprotocol.network/")); });
+    connect(cmcLinkAction, &QAction::triggered, []{ QDesktopServices::openUrl(QUrl("https://coinmarketcap.com/currencies/electra-protocol/")); });
+    connect(coingeckoLinkAction, &QAction::triggered, []{ QDesktopServices::openUrl(QUrl("https://www.coingecko.com/en/coins/electra-protocol")); });
 
 #ifdef ENABLE_WALLET
     if(walletFrame)
