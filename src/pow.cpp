@@ -20,15 +20,17 @@ static Mutex cs_target_cache;
 // peercoin: find last block index up to pindex
 static inline const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, const bool fProofOfStake)
 {
-    while (pindex && pindex->IsProofOfStake() != fProofOfStake && pindex->pprev)
+    while (pindex && pindex->IsProofOfStake() != fProofOfStake && pindex->pprev) {
         pindex = pindex->pprev;
+    }
     return pindex;
 }
 
 static inline const CBlockIndex* GetLastBlockIndexForAlgo(const CBlockIndex* pindex, const int& algo)
 {
-    while (pindex && CBlockHeader::GetAlgoType(pindex->nVersion) != algo && pindex->pprev)
+    while (pindex && CBlockHeader::GetAlgoType(pindex->nVersion) != algo && pindex->pprev) {
         pindex = pindex->pprev;
+    }
     return pindex;
 }
 
@@ -39,17 +41,18 @@ static inline const CBlockIndex* GetASERTReferenceBlockForAlgo(const CBlockIndex
 
     while (pindex->nHeight >= nASERTStartHeight) {
         const CBlockIndex* pprev = GetLastBlockIndexForAlgo(pindex->pprev, algo);
-        if (pprev)
+        if (pprev) {
             pindex = pprev;
-        else
+        } else {
             break;
+        }
     }
     return pindex;
 }
 
 // Note that calling this function as part of the difficulty calculation for every block results in a time complexity of O(n^2)
 // with respect to the number of blocks in the chain as it must count back to the reference block each time it is called while syncing
-static inline const CBlockIndex* GetASERTReferenceBlockAndHeightForAlgo(const CBlockIndex* pindex, const uint32_t& nProofOfWorkLimit, const int& nASERTStartHeight, const int& algo, uint32_t& nBlocksPassed)
+/*static inline const CBlockIndex* GetASERTReferenceBlockAndHeightForAlgo(const CBlockIndex* pindex, const uint32_t& nProofOfWorkLimit, const int& nASERTStartHeight, const int& algo, uint32_t& nBlocksPassed)
 {
     nBlocksPassed = 1; // Account for the ASERT reference block here
 
@@ -58,16 +61,17 @@ static inline const CBlockIndex* GetASERTReferenceBlockAndHeightForAlgo(const CB
 
     while (pindex->nHeight >= nASERTStartHeight) {
         const CBlockIndex* pprev = GetLastBlockIndexForAlgo(pindex->pprev, algo);
-        if (pprev)
+        if (pprev) {
             pindex = pprev;
-        else
+        } else {
             break;
+        }
 
         //if (pindex->nBits != (nProofOfWorkLimit - 1))
-            nBlocksPassed++;
+        nBlocksPassed++;
     }
     return pindex;
-}
+}*/
 
 unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
 {
@@ -274,9 +278,9 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
     {
         LOCK(cs_target_cache);
 
-        static arith_uint256 refBlockTargetCache;
-        static int nTargetCacheHeight = -2;
-        static int nTargetCacheAlgo = CBlockHeader::AlgoType::ALGO_COUNT;
+        static arith_uint256 refBlockTargetCache GUARDED_BY(cs_target_cache);
+        static int nTargetCacheHeight GUARDED_BY(cs_target_cache) = -2;
+        static int nTargetCacheAlgo GUARDED_BY(cs_target_cache) = CBlockHeader::AlgoType::ALGO_COUNT;
 
         if (nASERTBlockTargetsToAverage > 0 && nHeight >= nASERTStartHeight + nASERTBlockTargetsToAverage && nHeightDiff >= nASERTBlockTargetsToAverage) {
             if (!fUseCache || nTargetCacheHeight != static_cast<int>(nHeightDiff / nASERTBlockTargetsToAverage) || nTargetCacheAlgo != algo || refBlockTargetCache == arith_uint256() || fAlgoMissing) {
