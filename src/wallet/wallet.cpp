@@ -4656,8 +4656,6 @@ ScriptPubKeyMan* CWallet::AddWalletDescriptor(WalletDescriptor& desc, const Flat
 
 bool CWallet::SelectStakeCoins(std::set<CInputCoin>& setCoins, const bool fOnlyImmature) const
 {
-    AssertLockHeld(cs_wallet);
-
     // Choose coins to use
     const Balance& bal = GetBalance();
     CAmount nBalance = 0;
@@ -4685,8 +4683,6 @@ bool CWallet::SelectStakeCoins(std::set<CInputCoin>& setCoins, const bool fOnlyI
 // peercoin: sign block
 bool CWallet::GetBlockSigningPubKey(const CBlock& block, CPubKey& pubkey, bool& pubkeyInSig) const
 {
-    AssertLockHeld(cs_wallet);
-
     const bool fProofOfStake = block.IsProofOfStake();
     std::vector<std::vector<unsigned char>> vSolutions;
     const CTxOut& txout = fProofOfStake ? block.vtx[1]->vout[1] : block.vtx[0]->vout[0];
@@ -4770,8 +4766,6 @@ bool CWallet::GetBlockSigningPubKey(const CBlock& block, CPubKey& pubkey, bool& 
 // peercoin: sign block
 bool CWallet::SignBlock(CBlock& block, const CPubKey& pubkey) const
 {
-    AssertLockHeld(cs_wallet);
-
     // Try to sign with all ScriptPubKeyMans
     for (ScriptPubKeyMan* spk_man : GetAllScriptPubKeyMans()) {
         if (spk_man->SignBlock(block, pubkey) == SigningResult::OK)
