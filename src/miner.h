@@ -221,7 +221,6 @@ int64_t UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParam
 void RegenerateCommitments(CBlock& block);
 
 #ifdef ENABLE_WALLET
-bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, const std::shared_ptr<CWallet>& pwallet, const CAmount& nFees, const int& nHeight, const CBlockIndex* pindexPrev, const Consensus::Params& consensusParams);
 unsigned int CreateStakingThread(const std::shared_ptr<CWallet>& pwallet, ChainstateManager* chainman, CConnman* connman, CTxMemPool* mempool);
 void StopStakingThread(const unsigned int threadNum);
 void StopStakingThreads();
