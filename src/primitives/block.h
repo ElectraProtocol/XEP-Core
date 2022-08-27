@@ -139,7 +139,7 @@ public:
     {
         READWRITEAS(CBlockHeader, obj);
         READWRITE(obj.vtx);
-        if (obj.vtx.size() > 1 && obj.vtx[1]->IsCoinStake())
+        if (obj.vtx.size() >= 2 && obj.vtx[1]->IsCoinStake())
             READWRITE(obj.vchBlockSig);
     }
 
@@ -166,7 +166,7 @@ public:
     // peercoin: two types of block: proof-of-work or proof-of-stake
     /*bool IsProofOfStake() const
     {
-        return (vtx.size() > 1 && vtx[1]->IsCoinStake());
+        return (vtx.size() >= 2 && vtx[1]->IsCoinStake());
     }
 
     bool IsProofOfWork() const
