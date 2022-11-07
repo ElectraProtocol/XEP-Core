@@ -26,7 +26,7 @@ static inline const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, co
     return pindex;
 }
 
-static inline const CBlockIndex* GetLastBlockIndexForAlgo(const CBlockIndex* pindex, const int& algo)
+static inline const CBlockIndex* GetLastBlockIndexForAlgo(const CBlockIndex* pindex, const int algo)
 {
     while (pindex && CBlockHeader::GetAlgoType(pindex->nVersion) != algo && pindex->pprev) {
         pindex = pindex->pprev;
@@ -34,7 +34,7 @@ static inline const CBlockIndex* GetLastBlockIndexForAlgo(const CBlockIndex* pin
     return pindex;
 }
 
-static inline const CBlockIndex* GetASERTReferenceBlockForAlgo(const CBlockIndex* pindex, const int& nASERTStartHeight, const int& algo)
+static inline const CBlockIndex* GetASERTReferenceBlockForAlgo(const CBlockIndex* pindex, const int nASERTStartHeight, const int algo)
 {
     if (!pindex)
         return pindex;
@@ -52,7 +52,7 @@ static inline const CBlockIndex* GetASERTReferenceBlockForAlgo(const CBlockIndex
 
 // Note that calling this function as part of the difficulty calculation for every block results in a time complexity of O(n^2)
 // with respect to the number of blocks in the chain as it must count back to the reference block each time it is called while syncing
-/*static inline const CBlockIndex* GetASERTReferenceBlockAndHeightForAlgo(const CBlockIndex* pindex, const uint32_t& nProofOfWorkLimit, const int& nASERTStartHeight, const int& algo, uint32_t& nBlocksPassed)
+/*static inline const CBlockIndex* GetASERTReferenceBlockAndHeightForAlgo(const CBlockIndex* pindex, const uint32_t nProofOfWorkLimit, const int nASERTStartHeight, const int algo, uint32_t& nBlocksPassed)
 {
     nBlocksPassed = 1; // Account for the ASERT reference block here
 
@@ -404,7 +404,7 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
     return bnNew.GetCompactRoundedBase256();
 }
 
-bool CheckProofOfWork(const uint256& hash, const unsigned int& nBits, const int& algo, const Consensus::Params& params)
+bool CheckProofOfWork(const uint256& hash, const unsigned int nBits, const int algo, const Consensus::Params& params)
 {
     bool fNegative;
     bool fOverflow;
