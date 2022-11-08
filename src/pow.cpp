@@ -249,7 +249,7 @@ unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeade
     if (nHeight < nASERTStartHeight)
         return WeightedTargetExponentialMovingAverage(pindexLast, pblock, params);
 
-    const uint32_t nBlocksPassed = (fProofOfStake ? pindexLast->nHeightPoS : pindexLast->nHeightPoW) + 1; // Account for the ASERT reference block by adding one to the height
+    const uint32_t nBlocksPassed = (fProofOfStake ? pindexLast->nHeightPoS : pindexLast->nHeightPoW) + 1; // Account for the ASERT reference block (when it is the genesis block at height 0) by adding one to the height
 
     // Using a static variable concurrently in this context is safe and will not cause a race condition during initialization because C++11 guarantees that static variables will be initialized exactly once
     static const CBlockIndex* const pindexReferenceBlocks[CBlockHeader::AlgoType::ALGO_COUNT] = {
