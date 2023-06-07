@@ -178,6 +178,51 @@ void OverviewPage::handleOutOfSyncWarningClicks()
     Q_EMIT outOfSyncWarningClicked();
 }
 
+void OverviewPage::lockUnlockRequest()
+{
+    if (m_isLocked) {
+        walletModel->unlockWallet();
+    } else {
+        walletModel->lockWallet();
+    }
+}
+
+void OverviewPage::updateStakingInfoLayout()
+{
+    if (walletModel)
+    {
+        WalletModel::EncryptionStatus status = walletModel->getEncryptionStatus();
+
+        if (!ui->buttonStaking->isEnabled())
+            ui->buttonStaking->setEnabled(true);
+
+        if (status == WalletModel::EncryptionStatus::Locked) {
+            ui->buttonStaking->setIcon(QIcon(":/icons/lock_closed")); // locked icon
+            ui->labelWalletStateInfo->setText(tr("Wallet is encrypted and not staking"));
+            m_isLocked = true;
+        } else if (status == WalletModel::EncryptionStatus::Unencrypted) {
+            ui->buttonStaking->setEnabled(false);
+            if (walletModel->isLoadedOnStartup()) {
+                ui->labelWalletStateInfo->setText(tr("Wallet is not encrypted and staking"));
+                ui->buttonStaking->setIcon(QIcon(":/icons/staking")); // staking icon
+            } else {
+                ui->labelWalletStateInfo->setText(tr("Wallet is not encrypted and not staking"));
+                ui->buttonStaking->setIcon(QIcon(":/icons/lock_open")); // unlocked icon
+            }
+            m_isLocked = false;
+        } else {
+            if (walletModel->isLoadedOnStartup()) {
+                ui->buttonStaking->setIcon(QIcon(":/icons/staking")); // staking icon
+                ui->labelWalletStateInfo->setText(tr("Wallet is decrypted and staking"));
+            } else {
+                ui->buttonStaking->setIcon(QIcon(":/icons/lock_open")); // unlocked icon
+                ui->labelWalletStateInfo->setText(tr("Wallet is decrypted but not staking\nStaking is available only for wallets loaded on startup."));
+            }
+            m_isLocked = false;
+        }
+    }
+}
+
 void OverviewPage::setPrivacy(bool privacy)
 {
     m_privacy = privacy;
@@ -288,6 +333,14 @@ void OverviewPage::setWalletModel(WalletModel *model)
         connect(model, &WalletModel::notifyWatchonlyChanged, [this](bool showWatchOnly) {
             updateWatchOnlyLabels(showWatchOnly && !walletModel->wallet().privateKeysDisabled());
         });
+
+        // Set staking info layout
+        ui->buttonStaking->setText("");
+        ui->buttonStaking->setIconSize(QSize(24, 24));
+        updateStakingInfoLayout();
+
+        connect(ui->buttonStaking, &QPushButton::clicked, this, &OverviewPage::lockUnlockRequest); 
+        connect(walletModel, &WalletModel::updateOverviewPageStatus, this, &OverviewPage::updateStakingInfoLayout);
     }
 
     // update the display unit, to not use the default ("XEP")

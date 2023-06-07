@@ -41,6 +41,7 @@ public Q_SLOTS:
     void setBalance(const interfaces::WalletBalances& balances);
     void setPrivacy(bool privacy);
     void setOrphansHidden(bool hidden);
+    void updateStakingInfoLayout();
 
 Q_SIGNALS:
     void transactionClicked(const QModelIndex &index);
@@ -52,8 +53,9 @@ private:
     WalletModel *walletModel;
     interfaces::WalletBalances m_balances;
     bool m_privacy{false};
+    bool m_isLocked{true};
 
-    TxViewDelegate *txdelegate;
+    TxViewDelegate* txdelegate;
     std::unique_ptr<TransactionFilterProxy> filter;
 
 private Q_SLOTS:
@@ -62,6 +64,7 @@ private Q_SLOTS:
     void updateAlerts(const QString &warnings);
     void updateWatchOnlyLabels(bool showWatchOnly);
     void handleOutOfSyncWarningClicks();
+    void lockUnlockRequest();
 };
 
 #endif // BITCOIN_QT_OVERVIEWPAGE_H

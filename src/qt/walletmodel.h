@@ -163,6 +163,10 @@ public:
     bool getLastPasswordEnteredValid() const { return fLastPasswordEnteredValid; }
     void setLastPasswordEnteredValid(bool value) { fLastPasswordEnteredValid = value; }
 
+    // set this wallet as loaded on startup and having staking thread
+    void setLoadedOnStartup() { fLoadedOnStartup = true; }
+    bool isLoadedOnStartup() { return fLoadedOnStartup; }
+
 private:
     std::unique_ptr<interfaces::Wallet> m_wallet;
     std::unique_ptr<interfaces::Handler> m_handler_unload;
@@ -174,6 +178,9 @@ private:
     std::unique_ptr<interfaces::Handler> m_handler_can_get_addrs_changed;
     ClientModel* m_client_model;
     interfaces::Node& m_node;
+
+    //wallet has staking thread
+    bool fLoadedOnStartup = false;
 
     bool fHaveWatchOnly;
     bool fForceCheckBalanceChanged{false};
@@ -230,7 +237,14 @@ Q_SIGNALS:
     // Notify that there are now keys in the keypool
     void canGetAddressesChanged();
 
-public Q_SLOTS:
+    // trigger from OverviewPage buttonStaking clicked
+    void unlockWallet();
+    void lockWallet();
+
+    // update overview page button and status
+    void updateOverviewPageStatus();
+
+public Q_SLOTS :
     /* Starts a timer to periodically update the balance */
     void startPollBalance();
 

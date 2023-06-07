@@ -730,6 +730,7 @@ void XEPGUI::setWalletController(WalletController* wallet_controller)
     connect(wallet_controller, &WalletController::walletRemoved, this, &XEPGUI::removeWallet);
 
     for (WalletModel* wallet_model : m_wallet_controller->getOpenWallets()) {
+        wallet_model->setLoadedOnStartup();
         addWallet(wallet_model);
     }
 }
@@ -752,6 +753,9 @@ void XEPGUI::addWallet(WalletModel* walletModel)
     }
     const QString display_name = walletModel->getDisplayName();
     m_wallet_selector->addItem(display_name, QVariant::fromValue(walletModel));
+
+    connect(walletModel, &WalletModel::unlockWallet, walletFrame, &WalletFrame::unlockWallet);
+    connect(walletModel, &WalletModel::lockWallet, walletFrame, &WalletFrame::lockWallet);
 }
 
 void XEPGUI::removeWallet(WalletModel* walletModel)
@@ -1397,6 +1401,7 @@ void XEPGUI::updateWalletStatus()
     WalletModel * const walletModel = walletView->getWalletModel();
     setEncryptionStatus(walletModel->getEncryptionStatus());
     setHDStatus(walletModel->wallet().privateKeysDisabled(), walletModel->wallet().hdEnabled());
+    Q_EMIT walletModel->updateOverviewPageStatus();
 }
 #endif // ENABLE_WALLET
 

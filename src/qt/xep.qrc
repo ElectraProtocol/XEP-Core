@@ -27,6 +27,7 @@
         <file alias="history">res/icons/history.png</file>
         <file alias="overview">res/icons/overview.png</file>
         <file alias="export">res/icons/export.png</file>
+        <file alias="staking">res/icons/staking.png</file>
         <file alias="synced">res/icons/synced.png</file>
         <file alias="remove">res/icons/remove.png</file>
         <file alias="tx_mined">res/icons/tx_mined.png</file>
