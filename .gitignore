@@ -149,3 +149,5 @@ db4/
 osx_volname
 dist/
 *.background.tiff
+build-xep-qt-Desktop_Qt_5_15_2_MinGW_32_bit-Debug/.qtc_clangd/compile_commands.json
+contrib/xep-qt.pro.user
