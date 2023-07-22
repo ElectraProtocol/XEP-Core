@@ -130,6 +130,8 @@ public:
         consensus.mTreasuryPayees.emplace(CScript() << OP_0 << ParseHex("978a5064cd1fdf8c2510fe3fcbd65eaa5e98b32d"), 100); // 10% (full reward) for ep1qj799qexdrl0ccfgslcluh4j74f0f3vedatcv0k
         consensus.nTreasuryRewardPercentage = 10; // 10% of block reward goes to treasury
 
+        consensus.sBurnAddresses.emplace(CScript() << OP_DUP << OP_HASH160 << ParseHex("1fa15641f00f98b33a66054f11138a5fbe4d7058") << OP_EQUALVERIFY << OP_CHECKSIG); // PBURNomniXEPXXXXXXXXXXXXXXXXYZ2zjf
+
         consensus.nMinimumChainWork = uint256S("0x000000000000000000000000000000000000000000004d4a27e34ba8c684ba2b");
         consensus.defaultAssumeValid = uint256S("0x5fbff547e15f6ad22cad7dad4a79dd5ed893552ea809a10400cc618e52a2be91"); // 450000
 
@@ -264,6 +266,8 @@ public:
 
         consensus.mTreasuryPayees.emplace(CScript() << OP_0 << ParseHex("978a5064cd1fdf8c2510fe3fcbd65eaa5e98b32d"), 100); // 10% (full reward) for ep1qj799qexdrl0ccfgslcluh4j74f0f3vedatcv0k
         consensus.nTreasuryRewardPercentage = 10; // 10% of block reward goes to treasury
+
+        consensus.sBurnAddresses.emplace(CScript() << OP_DUP << OP_HASH160 << ParseHex("1fa15641f00f98b33a66054f11138a5fbe4d7058") << OP_EQUALVERIFY << OP_CHECKSIG); // PBURNomniXEPXXXXXXXXXXXXXXXXYZ2zjf
 
         consensus.nMinimumChainWork = uint256S("0x0000000000000000000000000000000000000000000000000000030d440d4400");
         consensus.defaultAssumeValid = uint256S("0x4a121e7765837b21bcffad979e499ecbf7184fcbf772c34c481433059d0840f8"); // 200000
@@ -436,6 +440,8 @@ public:
         consensus.mTreasuryPayees.emplace(CScript() << OP_0 << ParseHex("978a5064cd1fdf8c2510fe3fcbd65eaa5e98b32d"), 100); // 10% (full reward) for ep1qj799qexdrl0ccfgslcluh4j74f0f3vedatcv0k
         consensus.nTreasuryRewardPercentage = 10; // 10% of block reward goes to treasury
 
+        consensus.sBurnAddresses.emplace(CScript() << OP_DUP << OP_HASH160 << ParseHex("1fa15641f00f98b33a66054f11138a5fbe4d7058") << OP_EQUALVERIFY << OP_CHECKSIG); // PBURNomniXEPXXXXXXXXXXXXXXXXYZ2zjf
+
         // message start is defined as the first 4 bytes of the sha256d of the block script
         CHashWriter h(SER_DISK, 0);
         h << consensus.signet_challenge;
@@ -525,6 +531,8 @@ public:
 
         consensus.mTreasuryPayees.emplace(CScript() << OP_0 << ParseHex("978a5064cd1fdf8c2510fe3fcbd65eaa5e98b32d"), 100); // 10% (full reward) for ep1qj799qexdrl0ccfgslcluh4j74f0f3vedatcv0k
         consensus.nTreasuryRewardPercentage = 10; // 10% of block reward goes to treasury
+
+        consensus.sBurnAddresses.emplace(CScript() << OP_DUP << OP_HASH160 << ParseHex("1fa15641f00f98b33a66054f11138a5fbe4d7058") << OP_EQUALVERIFY << OP_CHECKSIG); // PBURNomniXEPXXXXXXXXXXXXXXXXYZ2zjf
 
         consensus.nMinimumChainWork = uint256{};
         consensus.defaultAssumeValid = uint256{};

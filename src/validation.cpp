@@ -1830,7 +1830,7 @@ DisconnectResult CChainState::DisconnectBlock(const CBlock& block, const CBlockI
         // Check that all outputs are available and match the outputs in the block itself
         // exactly.
         for (size_t o = 0; o < tx.vout.size(); o++) {
-            if (!tx.vout[o].scriptPubKey.IsUnspendable() && tx.vout[o].nValue != 0 && !tx.vout[o].scriptPubKey.empty()) {
+            if (!tx.vout[o].scriptPubKey.IsUnspendable() && tx.vout[o].nValue != 0 && !tx.vout[o].scriptPubKey.empty() && !Params().GetConsensus().sBurnAddresses.count(tx.vout[o].scriptPubKey)) {
                 COutPoint out(hash, o);
                 Coin coin;
                 bool is_spent = view.SpendCoin(out, &coin);
@@ -2386,7 +2386,7 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
         }
         nValueOut += tx.GetValueOut();
         for (const CTxOut& tx_out : tx.vout) {
-            if (tx_out.scriptPubKey.IsUnspendable() || tx_out.scriptPubKey.empty())
+            if (tx_out.scriptPubKey.IsUnspendable() || tx_out.scriptPubKey.empty() || chainparams.GetConsensus().sBurnAddresses.count(tx_out.scriptPubKey))
                 nAmountBurned += tx_out.nValue;
         }
 
