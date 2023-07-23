@@ -18,8 +18,10 @@
 #include <util/system.h>
 #include <validation.h>
 
+#include <unordered_map>
+
 // Hard checkpoints of stake modifiers to ensure they are deterministic
-static const std::map<int, unsigned int> mapStakeModifierCheckpoints = {
+static const std::unordered_map<int, unsigned int> mapStakeModifierCheckpoints = {
     { 0, 0x0e00670bu },
     { 50000, 0xcbe5a9b4u },
     { 100000, 0xbd074053u },
@@ -32,7 +34,7 @@ static const std::map<int, unsigned int> mapStakeModifierCheckpoints = {
     { 450000, 0xc85e93eau },
 };
 
-static const std::map<int, unsigned int> mapStakeModifierTestnetCheckpoints = {
+static const std::unordered_map<int, unsigned int> mapStakeModifierTestnetCheckpoints = {
     { 0, 0x0e00670bu },
     { 50000, 0x4af2e306u },
     { 100000, 0xd9e06043u },
