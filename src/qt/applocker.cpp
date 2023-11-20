@@ -7,6 +7,14 @@
 
 #include <crypto/pbkdf2_hmac.h>
 
+#include <QCloseEvent>
+#include <QDateTime>
+#include <QMessageBox>
+#include <QPushButton>
+#include <QRegularExpression>
+#include <QRegularExpressionValidator>
+#include <QScreen>
+
 AppLocker::AppLocker(QWidget *parent) :
     QWidget(parent),
     ui(new Ui::AppLocker)
@@ -14,7 +22,7 @@ AppLocker::AppLocker(QWidget *parent) :
     ui->setupUi(this);
     this->setWindowTitle(tr("Wallet locker"));
     this->setWindowModality(Qt::ApplicationModal);
-    QRegExpValidator *validatorReg = new QRegExpValidator(QRegExp("[1-9]\\d{5,9}"), this);
+    QRegularExpressionValidator *validatorReg = new QRegularExpressionValidator(QRegularExpression("[1-9]\\d{5,9}"), this);
 
     // Lock view (index 1)
     ui->stackedWidget->setCurrentIndex(1);

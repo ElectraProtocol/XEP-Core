@@ -399,6 +399,7 @@ void XEPGUI::createActions()
     connect(openRPCConsoleAction, &QAction::triggered, this, &XEPGUI::showDebugWindow);
     // prevents an open debug or appLocker window from becoming stuck/unusable on client shutdown
     connect(quitAction, &QAction::triggered, rpcConsole, &QWidget::hide);
+    connect(quitAction, &QAction::triggered, updateWalletDialog, &QWidget::close);
     connect(quitAction, &QAction::triggered, appLocker, &QWidget::close);
 
     websiteLinkAction = new QAction(tr("Electra Protocol Website"), this);
@@ -407,11 +408,8 @@ void XEPGUI::createActions()
     githubLinkAction = new QAction(tr("GitHub"), this);
     githubLinkAction->setStatusTip("https://github.com/ElectraProtocol/XEP-Core");
 
-    explorerOneAction = new QAction(tr("New explorer"), this);
+    explorerOneAction = new QAction(tr("Block Explorer"), this);
     explorerOneAction->setStatusTip("https://explorer.electraprotocol.network/");
-
-    explorerTwoAction = new QAction(tr("Legacy explorer"), this);
-    explorerTwoAction->setStatusTip("https://electraprotocol.network/");
 
     cmcLinkAction = new QAction(tr("CoinMarketCap"), this);
     cmcLinkAction->setStatusTip("https://coinmarketcap.com/currencies/electra-protocol/");
@@ -419,12 +417,11 @@ void XEPGUI::createActions()
     coingeckoLinkAction = new QAction(tr("CoinGecko"), this);
     coingeckoLinkAction->setStatusTip("https://www.coingecko.com/en/coins/electra-protocol");
 
-    connect(websiteLinkAction, &QAction::triggered, [this]{ QDesktopServices::openUrl(QUrl("https://www.electraprotocol.com/")); });
-    connect(githubLinkAction, &QAction::triggered, [this]{ QDesktopServices::openUrl(QUrl("https://github.com/ElectraProtocol/XEP-Core")); });
-    connect(explorerOneAction, &QAction::triggered, [this]{ QDesktopServices::openUrl(QUrl("https://explorer.electraprotocol.network/")); });
-    connect(explorerTwoAction, &QAction::triggered, [this]{ QDesktopServices::openUrl(QUrl("https://electraprotocol.network/")); });
-    connect(cmcLinkAction, &QAction::triggered, [this]{ QDesktopServices::openUrl(QUrl("https://coinmarketcap.com/currencies/electra-protocol/")); });
-    connect(coingeckoLinkAction, &QAction::triggered, [this]{ QDesktopServices::openUrl(QUrl("https://www.coingecko.com/en/coins/electra-protocol")); });
+    connect(websiteLinkAction, &QAction::triggered, []{ QDesktopServices::openUrl(QUrl("https://www.electraprotocol.com/")); });
+    connect(githubLinkAction, &QAction::triggered, []{ QDesktopServices::openUrl(QUrl("https://github.com/ElectraProtocol/XEP-Core")); });
+    connect(explorerOneAction, &QAction::triggered, []{ QDesktopServices::openUrl(QUrl("https://explorer.electraprotocol.network/")); });
+    connect(cmcLinkAction, &QAction::triggered, []{ QDesktopServices::openUrl(QUrl("https://coinmarketcap.com/currencies/electra-protocol/")); });
+    connect(coingeckoLinkAction, &QAction::triggered, []{ QDesktopServices::openUrl(QUrl("https://www.coingecko.com/en/coins/electra-protocol")); });
 
 #ifdef ENABLE_WALLET
     if(walletFrame)
@@ -599,7 +596,6 @@ void XEPGUI::createMenuBar()
     links_menu->addAction(githubLinkAction);
     links_menu->addSeparator();
     links_menu->addAction(explorerOneAction);
-    links_menu->addAction(explorerTwoAction);
     links_menu->addSeparator();
     links_menu->addAction(cmcLinkAction);
     links_menu->addAction(coingeckoLinkAction);
@@ -1458,6 +1454,8 @@ void XEPGUI::detectShutdown()
     {
         if(rpcConsole)
             rpcConsole->hide();
+        if (updateWalletDialog)
+            updateWalletDialog->close();
         if (appLocker) {
             if (appLocker->isWalletLocked()) {
                 appLocker->forceShutdown();

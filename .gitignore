@@ -35,6 +35,7 @@ config.cache
 config.log
 config.status
 configure
+configure~
 libtool
 src/config/xep-config.h
 src/config/xep-config.h.in

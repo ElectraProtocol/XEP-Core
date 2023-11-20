@@ -11,6 +11,7 @@
 #include <uint256.h>
 #include <limits>
 #include <map>
+#include <set>
 
 namespace Consensus {
 
@@ -67,6 +68,7 @@ struct Params {
     int nTreasuryPaymentsCycleBlocks;
     std::map<CScript, unsigned int> mTreasuryPayees;
     unsigned int nTreasuryRewardPercentage;
+    std::set<CScript> sBurnAddresses;
     /* Block hash that is excepted from BIP16 enforcement */
     uint256 BIP16Exception;
     /** Block height and hash at which BIP34 becomes active */

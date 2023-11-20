@@ -208,6 +208,22 @@ IsMineResult IsMineInner(const LegacyScriptPubKeyMan& keystore, const CScript& s
 
 } // namespace
 
+static inline CScript StripAdditionalTransactionData(CScript newScript)
+{
+    const unsigned int scriptSize = newScript.size();
+    if (scriptSize >= 29 && scriptSize <= 65 && newScript[0] == OP_DUP && newScript[1] == OP_HASH160 && newScript[2] == 20 && newScript[23] == OP_EQUALVERIFY &&
+        newScript[24] == OP_CHECKSIG && newScript[scriptSize - 2] == OP_CHECKBLOCKATHEIGHTVERIFY && newScript.back() == OP_2DROP) { // TxoutType::PUBKEYHASH_REPLAY
+        newScript = CScript(newScript.begin(), newScript.begin() + 25);
+    } else if (scriptSize >= 27 && scriptSize <= 63 && newScript[0] == OP_HASH160 && newScript[1] == 20 && newScript[22] == OP_EQUAL &&
+               newScript[scriptSize - 2] == OP_CHECKBLOCKATHEIGHTVERIFY && newScript.back() == OP_2DROP) { // TxoutType::SCRIPTHASH_REPLAY
+        newScript = CScript(newScript.begin(), newScript.begin() + 23);
+    } else if (scriptSize >= (CPubKey::COMPRESSED_SIZE + 6) && scriptSize <= (CPubKey::COMPRESSED_SIZE + 125) && newScript[0] == CPubKey::COMPRESSED_SIZE && newScript[CPubKey::COMPRESSED_SIZE + 1] == OP_CHECKSIG &&
+               newScript[scriptSize - 2] == OP_CHECKBLOCKATHEIGHTVERIFY && newScript.back() == OP_2DROP) { // TxoutType::PUBKEY_REPLAY and TxoutType::PUBKEY_DATA_REPLAY
+        newScript = CScript(newScript.begin(), newScript.begin() + CPubKey::COMPRESSED_SIZE + 2);
+    }
+    return newScript;
+}
+
 isminetype LegacyScriptPubKeyMan::IsMine(const CScript& script) const
 {
     switch (IsMineInner(*this, script, IsMineSigVersion::TOP)) {
@@ -606,7 +622,7 @@ SigningResult LegacyScriptPubKeyMan::SignBlock(CBlock& block, const CPubKey& pub
         return SigningResult::PRIVATE_KEY_NOT_AVAILABLE;
     }
 
-    if (key.Sign(block.GetHash(), block.vchBlockSig)) {
+    if (key.SignCompact(block.GetHash(), block.vchBlockSig, CPubKey::SigFlag::VERSION_SIG_COMPACT)) {
         return SigningResult::OK;
     }
     return SigningResult::SIGNING_FAILED;
@@ -847,7 +863,7 @@ bool LegacyScriptPubKeyMan::AddCryptedKey(const CPubKey &vchPubKey,
 bool LegacyScriptPubKeyMan::HaveWatchOnly(const CScript &dest) const
 {
     LOCK(cs_KeyStore);
-    return setWatchOnly.count(dest) > 0;
+    return setWatchOnly.count(StripAdditionalTransactionData(dest)) > 0;
 }
 
 bool LegacyScriptPubKeyMan::HaveWatchOnly() const
@@ -1455,7 +1471,7 @@ std::vector<CKeyID> GetAffectedKeys(const CScript& spk, const SigningProvider& p
 {
     std::vector<CScript> dummy;
     FlatSigningProvider out;
-    InferDescriptor(spk, provider)->Expand(0, DUMMY_SIGNING_PROVIDER, dummy, out);
+    InferDescriptor(StripAdditionalTransactionData(spk), provider)->Expand(0, DUMMY_SIGNING_PROVIDER, dummy, out);
     std::vector<CKeyID> ret;
     for (const auto& entry : out.pubkeys) {
         ret.push_back(entry.first);
@@ -1657,22 +1673,6 @@ bool DescriptorScriptPubKeyMan::GetNewDestination(const OutputType type, CTxDest
         WalletBatch(m_storage.GetDatabase()).WriteDescriptor(GetID(), m_wallet_descriptor);
         return true;
     }
-}
-
-static CScript StripAdditionalTransactionData(CScript newScript)
-{
-    const unsigned int scriptSize = newScript.size();
-    if (scriptSize >= 29 && scriptSize <= 65 && newScript[0] == OP_DUP && newScript[1] == OP_HASH160 && newScript[2] == 20 && newScript[23] == OP_EQUALVERIFY &&
-        newScript[24] == OP_CHECKSIG && newScript[scriptSize - 2] == OP_CHECKBLOCKATHEIGHTVERIFY && newScript.back() == OP_2DROP) { // TxoutType::PUBKEYHASH_REPLAY
-        newScript = CScript(newScript.begin(), newScript.begin() + 25);
-    } else if (scriptSize >= 27 && scriptSize <= 63 && newScript[0] == OP_HASH160 && newScript[1] == 20 && newScript[22] == OP_EQUAL &&
-               newScript[scriptSize - 2] == OP_CHECKBLOCKATHEIGHTVERIFY && newScript.back() == OP_2DROP) { // TxoutType::SCRIPTHASH_REPLAY
-        newScript = CScript(newScript.begin(), newScript.begin() + 23);
-    } else if (scriptSize >= (CPubKey::COMPRESSED_SIZE + 6) && scriptSize <= (CPubKey::COMPRESSED_SIZE + 125) && newScript[0] == CPubKey::COMPRESSED_SIZE && newScript[CPubKey::COMPRESSED_SIZE + 1] == OP_CHECKSIG &&
-               newScript[scriptSize - 2] == OP_CHECKBLOCKATHEIGHTVERIFY && newScript.back() == OP_2DROP) { // TxoutType::PUBKEY_REPLAY and TxoutType::PUBKEY_DATA_REPLAY
-        newScript = CScript(newScript.begin(), newScript.begin() + CPubKey::COMPRESSED_SIZE + 2);
-    }
-    return newScript;
 }
 
 isminetype DescriptorScriptPubKeyMan::IsMine(const CScript& script) const
@@ -2127,7 +2127,7 @@ SigningResult DescriptorScriptPubKeyMan::SignBlock(CBlock& block, const CPubKey&
         return SigningResult::PRIVATE_KEY_NOT_AVAILABLE;
     }
 
-    if (!key.Sign(block.GetHash(), block.vchBlockSig)) {
+    if (!key.SignCompact(block.GetHash(), block.vchBlockSig, CPubKey::SigFlag::VERSION_SIG_COMPACT)) {
         return SigningResult::SIGNING_FAILED;
     }
     return SigningResult::OK;

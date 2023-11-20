@@ -1,9 +1,10 @@
 // Copyright (c) 2012-2020 The Peercoin developers
 // Copyright (c) 2015-2019 The PIVX developers
-// Copyright (c) 2018-2021 John "ComputerCraftr" Studnicka
+// Copyright (c) 2018-2022 John "ComputerCraftr" Studnicka
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <chain.h>
 #include <chainparams.h>
 #include <consensus/validation.h>
 #include <hash.h>
@@ -17,8 +18,10 @@
 #include <util/system.h>
 #include <validation.h>
 
+#include <unordered_map>
+
 // Hard checkpoints of stake modifiers to ensure they are deterministic
-static const std::map<int, unsigned int> mapStakeModifierCheckpoints = {
+static const std::unordered_map<int, unsigned int> mapStakeModifierCheckpoints = {
     { 0, 0x0e00670bu },
     { 50000, 0xcbe5a9b4u },
     { 100000, 0xbd074053u },
@@ -31,7 +34,7 @@ static const std::map<int, unsigned int> mapStakeModifierCheckpoints = {
     { 450000, 0xc85e93eau },
 };
 
-static const std::map<int, unsigned int> mapStakeModifierTestnetCheckpoints = {
+static const std::unordered_map<int, unsigned int> mapStakeModifierTestnetCheckpoints = {
     { 0, 0x0e00670bu },
     { 50000, 0x4af2e306u },
     { 100000, 0xd9e06043u },
@@ -573,15 +576,10 @@ bool CheckStakeKernelHash(const unsigned int& nBits, const CBlockIndex* pindexPr
     // nHashDrift should be <= MAX_FUTURE_BLOCK_TIME otherwise we risk creating a block which will be rejected due to nTimeTx being too far in the future
     bool fSuccess = false;
     unsigned int nTryTime = 0;
-    const int nHeightStart = nHeightCurrent - 1;
     const int iteration = params.nStakeTimestampMask + 1; // 16 second time slots for 0xf masked time
     assert((nHashDrift & params.nStakeTimestampMask) == 0);
     for (int i = nHashDrift; i >= 0; i -= iteration) //iterate the hashing
     {
-        // New block came in, move on
-        if (::ChainActive().Height() != nHeightStart)
-            break;
-
         // Hash this iteration - start at nHashDrift and work backwards to nTimeTx
         nTryTime = nTimeTx + i; //nTimeTx + nHashDrift - i;
         hashProofOfStake = stakeHash(nTryTime, ss, prevout.n, prevout.hash, nTimeBlockFrom, true);
@@ -615,7 +613,7 @@ bool CheckStakeKernelHash(const unsigned int& nBits, const CBlockIndex* pindexPr
 }
 
 // Check kernel hash target and coinstake signature
-bool CheckProofOfStake(BlockValidationState& state, const CCoinsViewCache& view, const CBlockIndex* pindexPrev, const CTransactionRef& tx, const unsigned int& nBits, unsigned int nTimeTx, uint256& hashProofOfStake)
+bool CheckProofOfStake(BlockValidationState& state, const CCoinsViewCache& view, const CChain& active_chain, const CBlockIndex* pindexPrev, const CTransactionRef& tx, const unsigned int& nBits, unsigned int nTimeTx, uint256& hashProofOfStake)
 {
     if (!tx->IsCoinStake())
         return error("CheckProofOfStake() : called on non-coinstake %s", tx->GetHash().ToString());
@@ -639,7 +637,7 @@ bool CheckProofOfStake(BlockValidationState& state, const CCoinsViewCache& view,
 
     // Read txPrev and header of its block
     //const CBlockIndex* pindexFrom = LookupBlockIndex(hashBlock);
-    const CBlockIndex* pindexFrom = ::ChainActive()[coin.nHeight];
+    const CBlockIndex* pindexFrom = active_chain[coin.nHeight];
     if (!pindexFrom)
         return error("CheckProofOfStake() : block index not found");
 
@@ -647,7 +645,7 @@ bool CheckProofOfStake(BlockValidationState& state, const CCoinsViewCache& view,
     {
         int nIn = 0;
         //const CTxOut& prevTxOut = txPrev->vout[tx->vin[nIn].prevout.n];
-        TransactionSignatureChecker checker(&(*tx), nIn, coin.out.nValue, &::ChainActive(), PrecomputedTransactionData(*tx));
+        TransactionSignatureChecker checker(&(*tx), nIn, coin.out.nValue, &active_chain, PrecomputedTransactionData(*tx));
         ScriptError serror = SCRIPT_ERR_OK;
 
         if (!VerifyScript(tx->vin[nIn].scriptSig, coin.out.scriptPubKey, &(tx->vin[nIn].scriptWitness), STANDARD_CONTEXTUAL_SCRIPT_VERIFY_FLAGS, checker, &serror))

@@ -1271,13 +1271,12 @@ bool ReadRawBlockFromDisk(std::vector<uint8_t>& block, const CBlockIndex* pindex
     return ReadRawBlockFromDisk(block, block_pos, message_start);
 }
 
-CAmount GetBlockSubsidy(int nHeight, bool fProofOfStake, uint64_t nCoinAge, const Consensus::Params& consensusParams, bool fSuperblockPartOnly)
+CAmount GetBlockSubsidy(int nHeight, bool fProofOfStake, uint64_t nCoinAge, CAmount nMoneySupplyPrev, const Consensus::Params& consensusParams, bool fSuperblockPartOnly)
 {
     if (nHeight < 0) return 0;
 
     CAmount nSubsidy = 0;
     CAmount nRewardCoinYear = COIN / 100; // this is 1% APR interest by default (compounded once per stake); for every 100 coins held for a year, the reward when staked should be 1 coin (rewards increase proportionally with larger money supply/more coins staking)
-    const CAmount nMoneySupply = (nHeight > 0 && ::ChainActive().Tip()) ? (::ChainActive()[nHeight-1] ? ::ChainActive()[nHeight-1]->nMoneySupply : ::ChainActive().Tip()->nMoneySupply) : 0; // the previous block's money supply should probably be passed to this function instead of retrieving it here
 
     if (fProofOfStake) {
         nRewardCoinYear *= 3; // 3% interest (effective rate with continuous compounding is exp(0.03) - 1 = 3.045%)
@@ -1293,15 +1292,15 @@ CAmount GetBlockSubsidy(int nHeight, bool fProofOfStake, uint64_t nCoinAge, cons
     }
 
     if ((unsigned)nHeight >= consensusParams.nMinerConfirmationWindow) {
-        if (nMoneySupply + nSubsidy > MAX_MONEY) // soft supply cap (this will essentially put us into static PoW/PoS rewards)
+        if (nMoneySupplyPrev + nSubsidy > MAX_MONEY) // soft supply cap (this will essentially put us into static PoW/PoS rewards)
             nSubsidy = std::min(nSubsidy, 100 * COIN);
     }
 
     // 10% of reward goes to governance/treasury (90/100 goes to stakers and MNs)
     CAmount nSuperblockPart = 0;
     if (nHeight >= consensusParams.nTreasuryPaymentsStartBlock || nHeight >= consensusParams.nBudgetPaymentsStartBlock) {
-        nSuperblockPart = nSubsidy * consensusParams.nTreasuryRewardPercentage / 100;
-        nSubsidy = nSubsidy * std::max(100 - consensusParams.nTreasuryRewardPercentage, 1u) / 100;
+        nSuperblockPart = nSubsidy * consensusParams.nTreasuryRewardPercentage / 100; // 10%
+        nSubsidy = nSubsidy * std::max(100 - consensusParams.nTreasuryRewardPercentage, 1u) / 100; // 90%
     }
 
     return fSuperblockPartOnly ? nSuperblockPart : nSubsidy;
@@ -1317,28 +1316,19 @@ static inline bool IsTreasuryBlock(int nHeight, const Consensus::Params& consens
         return false;
 }
 
-CAmount GetTreasuryPayment(int nHeight, const Consensus::Params& consensusParams)
+CAmount GetTreasuryPayment(const CBlockIndex* pindexPrev, const Consensus::Params& consensusParams)
 {
-    if (IsTreasuryBlock(nHeight, consensusParams)) {
-        int startHeight = std::max(nHeight - consensusParams.nTreasuryPaymentsCycleBlocks, 0);
+    if (pindexPrev && IsTreasuryBlock(pindexPrev->nHeight + 1, consensusParams)) {
         CAmount blockValue = 0;
 
-        for (int i = startHeight; i < nHeight; i++) {
-            const CBlockIndex* const pindex = ::ChainActive()[i];
-            if (!IsTreasuryBlock(i, consensusParams)) // make sure previous treasury rewards aren't counted
-                blockValue += pindex->nMint; // add up coins from previous nTreasuryPaymentsCycleBlocks blocks
-            else {
-                /*uint64_t nCoinAge = 0;
-                if (pindex->IsProofOfStake()) {
-                    CBlock block;
-                    ReadBlockFromDisk(block, pindex, consensusParams);
-                    GetCoinAge(*block.vtx[1], ::ChainstateActive().CoinsTip(), block.nTime, i, nCoinAge);
-                }
-                blockValue += GetBlockSubsidy(i, pindex->IsProofOfStake(), nCoinAge, consensusParams, false);*/
-                blockValue += pindex->nMint - pindex->nTreasuryPayment;
-            }
+        for (int i = 0; pindexPrev && i < consensusParams.nTreasuryPaymentsCycleBlocks; i++) {
+            blockValue += pindexPrev->nMint - pindexPrev->nTreasuryPayment;
+
+            pindexPrev = pindexPrev->pprev;
         }
-        return blockValue * consensusParams.nTreasuryRewardPercentage / std::max(100 - consensusParams.nTreasuryRewardPercentage, 1u); // 10% of block value paid to treasury
+
+        // 10% of block value paid to treasury (we divide by 90 instead of 100 because blockValue only represents 90% of the total block reward)
+        return blockValue * consensusParams.nTreasuryRewardPercentage / std::max(100 - consensusParams.nTreasuryRewardPercentage, 1u);
     } else {
         return 0;
     }
@@ -1840,7 +1830,7 @@ DisconnectResult CChainState::DisconnectBlock(const CBlock& block, const CBlockI
         // Check that all outputs are available and match the outputs in the block itself
         // exactly.
         for (size_t o = 0; o < tx.vout.size(); o++) {
-            if (!tx.vout[o].scriptPubKey.IsUnspendable() && tx.vout[o].nValue != 0 && !tx.vout[o].scriptPubKey.empty()) {
+            if (!tx.vout[o].scriptPubKey.IsUnspendable() && tx.vout[o].nValue != 0 && !tx.vout[o].scriptPubKey.empty() && !Params().GetConsensus().sBurnAddresses.count(tx.vout[o].scriptPubKey)) {
                 COutPoint out(hash, o);
                 Coin coin;
                 bool is_spent = view.SpendCoin(out, &coin);
@@ -2044,11 +2034,11 @@ static unsigned int GetBlockScriptFlags(const CBlockIndex* pindex, const Consens
 }
 
 // These checks can only be done when all previous blocks have been added.
-static inline bool ContextualCheckPoSBlock(const CBlock& block, const bool& fProofOfStake, BlockValidationState& state, const CCoinsViewCache& view, CBlockIndex* pindex, const Consensus::Params& params, bool fJustCheck)
+static inline bool ContextualCheckPoSBlock(const CBlock& block, const bool& fProofOfStake, BlockValidationState& state, const CCoinsViewCache& view, const CChain& active_chain, CBlockIndex* pindex, const Consensus::Params& params, bool fJustCheck)
 {
     uint256 hashProofOfStake = uint256();
     // peercoin: verify hash target and signature of coinstake tx
-    if (fProofOfStake && !CheckProofOfStake(state, view, pindex->pprev, block.vtx[1], block.nBits, block.nTime, hashProofOfStake)) {
+    if (fProofOfStake && !CheckProofOfStake(state, view, active_chain, pindex->pprev, block.vtx[1], block.nBits, block.nTime, hashProofOfStake)) {
         LogPrintf("WARNING: %s: check proof-of-stake failed for block %s\n", __func__, pindex->GetBlockHash().ToString());
         return false; // do not error here as we expect this during initial block download
     }
@@ -2193,7 +2183,7 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
     else if (!fProofOfStake && pindex->nHeight > chainparams.GetConsensus().nLastPoWBlock)
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "PoW-ended", strprintf("%s: PoW period ended", __func__));
 
-    if (!pindex->GeneratedStakeModifier() && /*pindex->nStakeModifierChecksum == 0 &&*/ !ContextualCheckPoSBlock(block, fProofOfStake, state, view, pindex, chainparams.GetConsensus(), fJustCheck))
+    if (!pindex->GeneratedStakeModifier() && /*pindex->nStakeModifierChecksum == 0 &&*/ !ContextualCheckPoSBlock(block, fProofOfStake, state, view, m_chain, pindex, chainparams.GetConsensus(), fJustCheck))
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-pos", "proof of stake is incorrect"); // return invalid state here because we don't check in AcceptBlock
         //return error("%s: failed PoS check %s", __func__, state.ToString());
 
@@ -2378,7 +2368,7 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
                 LogPrintf("ERROR: %s: accumulated fee in the block out of range.\n", __func__);
                 return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-txns-accumulated-fee-outofrange");
             }
-            if (tx.IsCoinStake() && !GetCoinAge(tx, view, block.nTime, pindex->nHeight, nCoinAge))
+            if (tx.IsCoinStake() && !GetCoinAge(tx, view, m_chain, block.nTime, pindex->nHeight, nCoinAge))
                 return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-txns-coinage", strprintf("%s: unable to get coin age for coinstake %s", __func__, tx.GetHash().ToString()));
 
             // Check that transaction is BIP68 final
@@ -2396,7 +2386,7 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
         }
         nValueOut += tx.GetValueOut();
         for (const CTxOut& tx_out : tx.vout) {
-            if (tx_out.scriptPubKey.IsUnspendable() || tx_out.scriptPubKey.empty())
+            if (tx_out.scriptPubKey.IsUnspendable() || tx_out.scriptPubKey.empty() || chainparams.GetConsensus().sBurnAddresses.count(tx_out.scriptPubKey))
                 nAmountBurned += tx_out.nValue;
         }
 
@@ -2435,14 +2425,15 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
     LogPrint(BCLog::BENCH, "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs (%.2fms/blk)]\n", (unsigned)block.vtx.size(), MILLI * (nTime3 - nTime2), MILLI * (nTime3 - nTime2) / block.vtx.size(), nInputs <= 1 ? 0 : MILLI * (nTime3 - nTime2) / (nInputs-1), nTimeConnect * MICRO, nTimeConnect * MILLI / nBlocksTotal);
 
     const CAmount nActualBlockReward = nFees + nValueOut - nValueIn;
-    CAmount nExpectedBlockReward = GetBlockSubsidy(pindex->nHeight, fProofOfStake, nCoinAge, chainparams.GetConsensus());
-    CAmount nTreasuryPayment = GetTreasuryPayment(pindex->nHeight, chainparams.GetConsensus());
+    const CAmount nMoneySupplyPrev = pindex->pprev ? pindex->pprev->nMoneySupply : 0;
+    CAmount nExpectedBlockReward = GetBlockSubsidy(pindex->nHeight, fProofOfStake, nCoinAge, nMoneySupplyPrev, chainparams.GetConsensus());
+    CAmount nTreasuryPayment = GetTreasuryPayment(pindex->pprev, chainparams.GetConsensus());
 
     if (chainparams.NetworkIDString() != CBaseChainParams::MAIN) { // Half of fees are burned on and after the first PoS block
         nExpectedBlockReward += nFees / 2;
     }
 
-    if (nTreasuryPayment > 0 && IsTreasuryBlock(pindex->nHeight, chainparams.GetConsensus())) {
+    if (nTreasuryPayment > 0) {
         const CTransaction& txNew = fProofOfStake ? *block.vtx[1] : *block.vtx[0];
         const std::map<CScript, unsigned int>& treasuryPayees = chainparams.GetConsensus().mTreasuryPayees;
         CAmount nActualTreasuryPayment = 0;
@@ -2482,7 +2473,7 @@ bool CChainState::ConnectBlock(const CBlock& block, BlockValidationState& state,
 
     // peercoin: track money supply and mint amount info
     pindex->nMint = nActualBlockReward;
-    pindex->nMoneySupply = (pindex->pprev ? pindex->pprev->nMoneySupply : 0) + pindex->nMint - nAmountBurned - nFees; // Fees are not added to nMoneySupply because they are already part of the circulating supply
+    pindex->nMoneySupply = nMoneySupplyPrev + pindex->nMint - nAmountBurned - nFees; // Fees are not added to nMoneySupply because they are already part of the circulating supply
     pindex->nTreasuryPayment = nTreasuryPayment;
     //LogPrintf("ConnectBlock(): INFO: nValueOut: %s, nValueIn: %s, nFees: %s, nMint: %s\n", FormatMoney(nValueOut), FormatMoney(nValueIn), FormatMoney(nFees), FormatMoney(pindex->nMint));
 
@@ -3823,9 +3814,10 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
     // Check proof of work
     const Consensus::Params& consensusParams = params.GetConsensus();
     const uint32_t nRequiredBits = GetNextWorkRequired(pindexPrev, &block, consensusParams);
-    //LogPrintf("%s: block %i - bnTarget = %s, expected bnTarget = %s\n", __func__, nHeight, arith_uint256().SetCompact(block.nBits).ToString(), arith_uint256().SetCompact(nRequiredBits).ToString());
-    if (block.nBits != nRequiredBits)
+    //LogPrintf("%s: block %i - bnTarget = %s, expected bnTarget = %s\n", __func__, nHeight, arith_uint256().SetCompactBase256(block.nBits).ToString(), arith_uint256().SetCompactBase256(nRequiredBits).ToString());
+    if (block.nBits != nRequiredBits) {
         return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "bad-diffbits", "incorrect difficulty target");
+    }
 
     // Reject new PoW algorithms until they have been activated
     if (nHeight < 1 && CBlockHeader::GetAlgoType(block.nVersion) > CBlockHeader::AlgoType::ALGO_POW_SHA256)
@@ -4193,7 +4185,7 @@ bool CChainState::AcceptBlock(const std::shared_ptr<const CBlock>& pblock, Block
     }
 
     // peercoin: check PoS
-    if (fCheckPoS && !ContextualCheckPoSBlock(block, block.IsProofOfStake(), state, CoinsTip(), pindex, chainparams.GetConsensus(), false)) {
+    if (fCheckPoS && !ContextualCheckPoSBlock(block, block.IsProofOfStake(), state, CoinsTip(), m_chain, pindex, chainparams.GetConsensus(), false)) {
         pindex->nStatus |= BLOCK_FAILED_VALID;
         setDirtyBlockIndex.insert(pindex);
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-pos", "proof of stake is incorrect");
@@ -4535,9 +4527,6 @@ bool BlockManager::LoadBlockIndex(
 
         // peercoin: calculate stake modifier checksum
         pindex->nStakeModifierChecksum = GetStakeModifierChecksum(pindex);
-        if (::ChainActive().Contains(pindex))
-            if (!CheckStakeModifierCheckpoints(pindex->nHeight, pindex->nStakeModifierChecksum))
-                return error("LoadBlockIndex() : Failed stake modifier checkpoint height=%d, modifier=0x%016llx", pindex->nHeight, pindex->nStakeModifier);
     }
 
     return true;
@@ -5731,7 +5720,7 @@ void ChainstateManager::MaybeRebalanceCaches()
 // guaranteed to be in main chain by sync-checkpoint. This rule is
 // introduced to help nodes establish a consistent view of the coin
 // age (trust score) of competing branches.
-bool GetCoinAge(const CTransaction& tx, const CCoinsViewCache& view, unsigned int nTimeTx, int nHeightCurrent, uint64_t& nCoinAge, const CBlockIndex* pindexFrom)
+bool GetCoinAge(const CTransaction& tx, const CCoinsViewCache& view, const CChain& active_chain, unsigned int nTimeTx, int nHeightCurrent, uint64_t& nCoinAge, const CBlockIndex* pindexFrom)
 {
     arith_uint256 bnSatoshiSecond = 0;  // coin age in the unit of satoshi-seconds
     nCoinAge = 0;
@@ -5748,7 +5737,7 @@ bool GetCoinAge(const CTransaction& tx, const CCoinsViewCache& view, unsigned in
         int64_t nValueIn;
         //uint32_t nTimeTxPrev;
         if (view.GetCoin(prevout, coin)) {
-            pindexFrom = ::ChainActive()[coin.nHeight];
+            pindexFrom = active_chain[coin.nHeight];
             nValueIn = coin.out.nValue;
             //nTimeTxPrev = coin.nTime;
         } else {

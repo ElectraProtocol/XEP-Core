@@ -22,6 +22,6 @@ unsigned int WeightedTargetExponentialMovingAverage(const CBlockIndex* pindexLas
 unsigned int AverageTargetASERT(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params&);
 
 /** Check whether a block hash satisfies the proof-of-work requirement specified by nBits */
-bool CheckProofOfWork(const uint256& hash, const unsigned int& nBits, const int& algo, const Consensus::Params&);
+bool CheckProofOfWork(const uint256& hash, const unsigned int nBits, const int algo, const Consensus::Params&);
 
 #endif // BITCOIN_POW_H

@@ -175,7 +175,6 @@ private:
     // Links menu
     QAction* websiteLinkAction = nullptr;
     QAction* explorerOneAction = nullptr;
-    QAction* explorerTwoAction = nullptr;
     QAction* githubLinkAction = nullptr;
     QAction* cmcLinkAction = nullptr;
     QAction* coingeckoLinkAction = nullptr;

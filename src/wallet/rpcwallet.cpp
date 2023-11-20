@@ -366,7 +366,7 @@ static RPCHelpMan setlabel()
     };
 }
 
-void ParseRecipients(CWallet* const pwallet, const UniValue& address_amounts, const UniValue& subtract_fee_outputs, std::vector<CRecipient> &recipients) {
+void ParseRecipients(CWallet* const pwallet, const UniValue& address_amounts, const UniValue& subtract_fee_outputs, std::vector<CRecipient> &recipients) EXCLUSIVE_LOCKS_REQUIRED(pwallet->cs_wallet) {
     std::set<CTxDestination> destinations;
     int i = 0;
     for (const std::string& address: address_amounts.getKeys()) {

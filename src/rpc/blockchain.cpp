@@ -193,11 +193,13 @@ UniValue blockToJSON(const CBlock& block, const CBlockIndex* tip, const CBlockIn
     result.pushKV("modifierV2", blockindex->nStakeModifierV2.GetHex());
     result.pushKV("modifierchecksum", strprintf("%08x", blockindex->nStakeModifierChecksum));
     result.pushKV("mint", ValueFromAmount(blockindex->nMint));
-    result.pushKV("moneysupply", ValueFromAmount(blockindex->nMoneySupply));
     result.pushKV("treasurypayment", ValueFromAmount(blockindex->nTreasuryPayment));
+    result.pushKV("moneysupply", ValueFromAmount(blockindex->nMoneySupply));
 
     if (blockindex->IsProofOfStake()) {
         result.pushKV("proof", "stake");
+        result.pushKV("algoheight", blockindex->nHeightPoS);
+        result.pushKV("signature", HexStr(block.vchBlockSig));
 
         UniValue stakeData(UniValue::VOBJ);
         stakeData.pushKV("proofhash", blockindex->hashProofOfStake.GetHex());
@@ -240,6 +242,7 @@ UniValue blockToJSON(const CBlock& block, const CBlockIndex* tip, const CBlockIn
         result.pushKV("coinstake", stakeData);
     } else {
         result.pushKV("proof", "work");
+        result.pushKV("algoheight", blockindex->nHeightPoW);
         result.pushKV("proofhash", block.GetPoWHash().GetHex());
     }
 

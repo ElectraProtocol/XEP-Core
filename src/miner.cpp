@@ -44,7 +44,15 @@
 static Mutex cs_thread_containers;
 static std::list<std::pair<unsigned int, std::thread>> staking_threads GUARDED_BY(cs_thread_containers);
 static std::list<CThreadInterrupt> staking_thread_interrupters GUARDED_BY(cs_thread_containers);
+
+// Forward definition with thread safety annotations
+// TODO: Remove "NO_THREAD_SAFETY_ANALYSIS" and replace it with the correct
+// annotation "EXCLUSIVE_LOCKS_REQUIRED(cs_main, pwallet->cs_wallet)". The
+// annotation "NO_THREAD_SAFETY_ANALYSIS" was temporarily added to avoid having
+// to split BlockAssembler::CreateNewBlock into multiple different functions.
+bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, const std::shared_ptr<CWallet>& pwallet, const CAmount& nFees, const int& nHeight, const CBlockIndex* pindexPrev, const Consensus::Params& consensusParams) NO_THREAD_SAFETY_ANALYSIS;
 #endif // ENABLE_WALLET
+
 int64_t nLastCoinStakeSearchInterval = 0;
 
 int64_t UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, const CBlockIndex* pindexPrev)
@@ -119,9 +127,9 @@ void BlockAssembler::resetBlock()
     nFees = 0;
 }
 
-static inline void FillTreasuryPayee(CMutableTransaction& txNew, const int nHeight, const Consensus::Params& consensusParams)
+static inline void FillTreasuryPayee(CMutableTransaction& txNew, const CBlockIndex* pindexPrev, const Consensus::Params& consensusParams)
 {
-    const CAmount nTreasuryPayment = GetTreasuryPayment(nHeight, consensusParams);
+    const CAmount nTreasuryPayment = GetTreasuryPayment(pindexPrev, consensusParams);
 
     if (nTreasuryPayment > 0) {
         const std::map<CScript, unsigned int>& treasuryPayees = consensusParams.mTreasuryPayees;
@@ -148,13 +156,14 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
         return nullptr;
     CBlock* const pblock = &pblocktemplate->block; // pointer for convenience
 
+    const bool fProofOfStake = pwallet != nullptr;
+
     LOCK2(cs_main, m_mempool.cs);
     CBlockIndex* pindexPrev = ::ChainActive().Tip();
     assert(pindexPrev != nullptr);
     nHeight = pindexPrev->nHeight + 1;
 
     const Consensus::Params &consensusParams = chainparams.GetConsensus();
-    const bool fProofOfStake = pwallet != nullptr;
 
     // Create coinbase transaction.
     CMutableTransaction coinbaseTx;
@@ -247,8 +256,8 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     m_last_block_weight = nBlockWeight;
 
     if (!fProofOfStake) {
-        coinbaseTx.vout[0].nValue = GetBlockSubsidy(nHeight, false, 0, consensusParams) + (chainparams.NetworkIDString() != CBaseChainParams::MAIN ? nFees / 2 : 0);
-        FillTreasuryPayee(coinbaseTx, nHeight, consensusParams);
+        coinbaseTx.vout[0].nValue = GetBlockSubsidy(nHeight, false, 0, pindexPrev->nMoneySupply, consensusParams) + (chainparams.NetworkIDString() != CBaseChainParams::MAIN ? nFees / 2 : 0);
+        FillTreasuryPayee(coinbaseTx, pindexPrev, consensusParams);
     }
     coinbaseTx.vin[0].scriptSig = CScript() << nHeight << OP_0;
     pblocktemplate->entries[0].tx = MakeTransactionRef(std::move(coinbaseTx));
@@ -551,8 +560,6 @@ void IncrementExtraNonce(CBlock* pblock, const CBlockIndex* pindexPrev, unsigned
 #ifdef ENABLE_WALLET
 bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, const std::shared_ptr<CWallet>& pwallet, const CAmount& nFees, const int& nHeight, const CBlockIndex* pindexPrev, const Consensus::Params& consensusParams)
 {
-    AssertLockHeld(pwallet->cs_wallet);
-
     const int nTargetStakeInputs = gArgs.GetArg("-targetstakeinputs", DEFAULT_TARGET_STAKE_INPUTS);
     constexpr CAmount nAutomaticInputSize = 2000000 * COIN;
     bool fKernelFound = false;
@@ -565,9 +572,6 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, const std
         CAmount nCredit = 0;
         CScript scriptPubKeyKernel;
         for (const auto& pcoin : setCoins) {
-            if (::ChainActive().Height() != pindexPrev->nHeight)
-                break;
-
             CCoinsViewCache view(&::ChainstateActive().CoinsTip());
             const COutPoint& prevout = pcoin.outpoint;
             Coin coin;
@@ -727,10 +731,10 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, const std
                     LogPrintf("%s : added kernel type=%s\n", __func__, GetTxnOutputType(whichType));
 
                 uint64_t nCoinAge = 0;
-                if (!GetCoinAge((const CTransaction)coinstakeTx, view, pblock->nTime, nHeight, nCoinAge))
+                if (!GetCoinAge((const CTransaction)coinstakeTx, view, ::ChainActive(), pblock->nTime, nHeight, nCoinAge))
                     return error("%s : failed to calculate coin age", __func__);
 
-                const CAmount nReward = GetBlockSubsidy(nHeight, true, nCoinAge, consensusParams) + (Params().NetworkIDString() != CBaseChainParams::MAIN ? nFees / 2 : 0);
+                const CAmount nReward = GetBlockSubsidy(nHeight, true, nCoinAge, pindexPrev->nMoneySupply, consensusParams) + (Params().NetworkIDString() != CBaseChainParams::MAIN ? nFees / 2 : 0);
                 // Refuse to create mint that has zero or negative reward
                 if (nReward < 0)
                     return error("%s : not creating mint with negative subsidy", __func__);
@@ -762,7 +766,7 @@ bool CreateCoinStake(CMutableTransaction& coinstakeTx, CBlock* pblock, const std
                 }
 
                 // Add treasury payment
-                FillTreasuryPayee(coinstakeTx, nHeight, consensusParams);
+                FillTreasuryPayee(coinstakeTx, pindexPrev, consensusParams);
 
                 // Sign
                 if (!pwallet->SignTransaction(coinstakeTx))
@@ -875,7 +879,7 @@ static inline void PoSMiner(const std::shared_ptr<CWallet>& pwallet, CThreadInte
         std::unique_ptr<CBlockTemplate> pblocktemplate;
 
         {
-            LOCK(pwallet->cs_wallet);
+            LOCK(pwallet->cs_wallet); // Lock cs_wallet before cs_main in CreateNewBlock
 
             pblocktemplate = BlockAssembler(*mempool, Params()).CreateNewBlock(CScript(), pwallet, &fPoSCancel);
         }
